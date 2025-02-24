@@ -34,11 +34,6 @@ y = df['Left']
 # Split the data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Scale the features
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
-
 # Train XGBoost model with Grid Search
 param_grid = {
     'max_depth': [3, 5, 7],
@@ -56,7 +51,7 @@ grid_search = GridSearchCV(
     n_jobs=-1
 )
 
-grid_search.fit(X_train_scaled, y_train)
+grid_search.fit(X_train, y_train)
 
 # Get best model
 model = grid_search.best_estimator_
@@ -66,7 +61,7 @@ print("\nBest Parameters:", grid_search.best_params_)
 print("Best CV Accuracy: {:.2f}%".format(grid_search.best_score_ * 100))
 
 # Make predictions
-y_pred = model.predict(X_test_scaled)
+y_pred = model.predict(X_test)
 
 # Print results
 print("Accuracy:", accuracy_score(y_test, y_pred))
