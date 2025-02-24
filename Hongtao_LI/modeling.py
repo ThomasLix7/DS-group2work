@@ -50,20 +50,18 @@ y_test = pd.Series(y_test)
 # 2. Logistic Regression
 # ======================
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import GridSearchCV
 
 logit_pipe = Pipeline([
     ('preprocessor', preprocessor),
-    ('model', LogisticRegression(class_weight='balanced', max_iter=1000))
+    ('model', LogisticRegression(
+        class_weight='balanced',
+        C=0.1,  # Best value from previous grid search
+        solver='liblinear',  # Best performing solver
+        max_iter=1000
+    ))
 ])
 
-param_grid = {
-    'model__C': [0.01, 0.1, 1],
-    'model__solver': ['lbfgs', 'saga']
-}
-
-logit_gs = GridSearchCV(logit_pipe, param_grid, scoring='roc_auc', cv=5)
-logit_gs.fit(X_train, y_train)
+logit_model = logit_pipe.fit(X_train, y_train)
 
 # ======================
 # 3. KNN Implementation
@@ -75,16 +73,14 @@ from imblearn.over_sampling import SMOTE
 knn_pipe = ImbPipeline([
     ('preprocessor', preprocessor),
     ('smote', SMOTE(sampling_strategy=0.5, random_state=42)),
-    ('model', KNeighborsClassifier(weights='distance'))
+    ('model', KNeighborsClassifier(
+        weights='distance',
+        n_neighbors=15,  # Optimal neighbor count
+        metric='euclidean'  # Best performing metric
+    ))
 ])
 
-knn_params = {
-    'model__n_neighbors': [5, 15, 25],
-    'model__metric': ['euclidean', 'manhattan']
-}
-
-knn_gs = GridSearchCV(knn_pipe, knn_params, scoring='roc_auc', cv=5)
-knn_gs.fit(X_train, y_train)
+knn_model = knn_pipe.fit(X_train, y_train)
 
 # ======================
 # 4. XGBoost Implementation
@@ -95,18 +91,14 @@ xgb_pipe = Pipeline([
     ('preprocessor', preprocessor),
     ('model', XGBClassifier(
         scale_pos_weight=(len(y_train)-sum(y_train))/sum(y_train),
+        learning_rate=0.1,  # Optimal learning rate
+        max_depth=3,  # Best depth from previous search
         eval_metric='logloss',
         use_label_encoder=False
     ))
 ])
 
-xgb_params = {
-    'model__learning_rate': [0.05, 0.1],
-    'model__max_depth': [3, 5]
-}
-
-xgb_gs = GridSearchCV(xgb_pipe, xgb_params, scoring='roc_auc', cv=5)
-xgb_gs.fit(X_train, y_train)
+xgb_model = xgb_pipe.fit(X_train, y_train)
 
 # ======================
 # 5. Neural Network
@@ -116,9 +108,11 @@ from sklearn.neural_network import MLPClassifier
 nn_pipe = Pipeline([
     ('preprocessor', preprocessor),
     ('model', MLPClassifier(
-        hidden_layer_sizes=(64, 32),  # Two hidden layers
+        hidden_layer_sizes=(64, 32),
         activation='relu',
         solver='adam',
+        alpha=0.001,  # Optimal regularization
+        learning_rate_init=0.001,  # Best initial learning rate
         max_iter=1000,
         early_stopping=True,
         validation_fraction=0.2,
@@ -127,15 +121,7 @@ nn_pipe = Pipeline([
     ))
 ])
 
-# Define parameters for grid search
-nn_params = {
-    'model__alpha': [0.0001, 0.001],  # Regularization parameter
-    'model__learning_rate_init': [0.001, 0.01]  # Initial learning rate
-}
-
-# Perform grid search
-nn_gs = GridSearchCV(nn_pipe, nn_params, scoring='roc_auc', cv=5)
-nn_gs.fit(X_train, y_train)
+nn_model = nn_pipe.fit(X_train, y_train)
 
 # ======================
 # 6. Model Evaluation
@@ -144,10 +130,10 @@ from sklearn.metrics import roc_auc_score, classification_report, roc_curve, acc
 import numpy as np
 
 models = {
-    'Logistic': logit_gs,
-    'KNN': knn_gs,
-    'XGBoost': xgb_gs,
-    'NeuralNet': nn_gs
+    'Logistic': logit_model,
+    'KNN': knn_model,
+    'XGBoost': xgb_model,
+    'NeuralNet': nn_model
 }
 
 results = {}
@@ -156,7 +142,7 @@ print("="*50)
 
 for name, model in models.items():
     # Get predictions
-    y_pred_proba = model.best_estimator_.predict_proba(X_test)[:, 1]
+    y_pred_proba = model.predict_proba(X_test)[:, 1]
     y_pred = (y_pred_proba > 0.5).astype(int)
     
     # Calculate metrics
@@ -179,7 +165,7 @@ for name, model in models.items():
 # Calculate optimal thresholds
 optimal_thresholds = {}
 for name in models:
-    y_pred = models[name].best_estimator_.predict_proba(X_test)[:, 1]
+    y_pred = models[name].predict_proba(X_test)[:, 1]
     fpr, tpr, thresholds = roc_curve(y_test, y_pred)
     optimal_idx = np.argmax(tpr - fpr)
     optimal_thresholds[name] = thresholds[optimal_idx]
@@ -190,7 +176,7 @@ for name in models:
 import shap
 
 # Feature importance analysis
-explainer_xgb = shap.TreeExplainer(xgb_gs.best_estimator_.named_steps['model'])
+explainer_xgb = shap.TreeExplainer(xgb_model.named_steps['model'])
 # Convert X_test to numeric before SHAP analysis
 X_test_numeric = X_test.copy()
 X_test_numeric['Gender'] = X_test_numeric['Gender'].cat.codes
@@ -204,7 +190,7 @@ import matplotlib.pyplot as plt
 # ROC Curves
 plt.figure(figsize=(10,6))
 for name, model in models.items():
-    y_pred = model.best_estimator_.predict_proba(X_test)[:, 1]
+    y_pred = model.predict_proba(X_test)[:, 1]
     fpr, tpr, _ = roc_curve(y_test, y_pred)
     auc = roc_auc_score(y_test, y_pred)
     plt.plot(fpr, tpr, label=f'{name} (AUC = {auc:.2f})')
@@ -231,10 +217,10 @@ def generate_report(results):
         'auc_scores': {k: v['AUC'] for k,v in results.items()},
         'risk_thresholds': optimal_thresholds,
         'top_features': {
-            'Logistic': pd.Series(logit_gs.best_estimator_.named_steps['model'].coef_[0],
-                                 index=logit_gs.best_estimator_.named_steps['preprocessor'].get_feature_names_out()),
-            'XGBoost': pd.Series(xgb_gs.best_estimator_.named_steps['model'].feature_importances_,
-                                index=xgb_gs.best_estimator_.named_steps['preprocessor'].get_feature_names_out())
+            'Logistic': pd.Series(logit_model.named_steps['model'].coef_[0],
+                                 index=logit_model.named_steps['preprocessor'].get_feature_names_out()),
+            'XGBoost': pd.Series(xgb_model.named_steps['model'].feature_importances_,
+                                index=xgb_model.named_steps['preprocessor'].get_feature_names_out())
         }
     }
     return report
