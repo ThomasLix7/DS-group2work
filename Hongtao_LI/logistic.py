@@ -9,7 +9,12 @@ from sklearn.metrics import accuracy_score, f1_score, classification_report, roc
 from sklearn.calibration import calibration_curve
 
 # Load and clean data
-df = pd.read_csv("Branch1.csv")
+df1 = pd.read_csv("Branch1.csv")
+df2 = pd.read_csv("Branch2.csv")
+df3 = pd.read_csv("Branch3.csv")
+
+# Concatenate the dataframes
+df = pd.concat([df1, df2, df3], ignore_index=True)
 
 # Convert 'Gender' to categorical
 df['Gender'] = df['Gender'].astype('category')

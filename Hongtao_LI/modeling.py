@@ -10,8 +10,13 @@ from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
-# Load and combine branch data
-df = pd.read_csv('Branch1.csv')
+# Load and clean data
+df1 = pd.read_csv("Branch1.csv")
+df2 = pd.read_csv("Branch2.csv")
+df3 = pd.read_csv("Branch3.csv")
+
+# Concatenate the dataframes
+df = pd.concat([df1, df2, df3], ignore_index=True)
 
 # Convert 'Gender' to categorical
 df['Gender'] = df['Gender'].astype('category')
