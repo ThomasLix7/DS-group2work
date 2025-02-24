@@ -71,6 +71,10 @@ model = MLPClassifier(
     alpha=0.01
 )
 
+# Apply SMOTE to training data
+smote = SMOTE(random_state=42)
+X_res, y_res = smote.fit_resample(X_train_scaled, y_train)
+
 # Create and run grid search with stratified cross-validation
 grid_search = GridSearchCV(
     estimator=model,
@@ -80,7 +84,7 @@ grid_search = GridSearchCV(
     n_jobs=-1,
     verbose=2
 )
-grid_search.fit(X_train_scaled, y_train)
+grid_search.fit(X_res, y_res)
 
 # Get best model
 best_nn = grid_search.best_estimator_
@@ -97,7 +101,7 @@ print(f"Average CV score: {cv_scores.mean():.3f} (+/- {cv_scores.std() * 2:.3f})
 
 # Calculate learning curve using the best model
 train_sizes, train_scores, val_scores = learning_curve(
-    best_nn, X_train_scaled, y_train,
+    best_nn, X_res, y_res,
     train_sizes=np.linspace(0.1, 1.0, 10),
     cv=StratifiedKFold(n_splits=5),
     scoring='roc_auc'

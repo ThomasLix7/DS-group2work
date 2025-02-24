@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, roc_curve, precision_recall_curve, classification_report
 from sklearn.impute import SimpleImputer
 
 def load_and_preprocess_data():
@@ -121,17 +121,32 @@ def train_model(df):
     print(f"Best overall score: {best_score:.4f}")
     
     # Make predictions with best model
-    y_pred = best_model.predict(X_test_scaled)
     y_pred_proba = best_model.predict_proba(X_test_scaled)[:, 1]
-    
-    # Calculate metrics
-    metrics = {
-        'accuracy': accuracy_score(y_test, y_pred),
-        'precision': precision_score(y_test, y_pred),
-        'recall': recall_score(y_test, y_pred),
-        'f1': f1_score(y_test, y_pred),
-        'roc_auc': roc_auc_score(y_test, y_pred_proba)
-    }
+
+    # Find optimal threshold using ROC curve
+    fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
+    optimal_idx = np.argmax(tpr - fpr)
+    optimal_threshold = thresholds[optimal_idx]
+
+    # Find optimal threshold using precision-recall curve
+    precisions, recalls, thresholds_pr = precision_recall_curve(y_test, y_pred_proba)
+    f1_scores = 2 * (precisions * recalls) / (precisions + recalls)
+    optimal_idx_pr = np.argmax(f1_scores[:-1])  # Last element of f1_scores may be undefined
+    optimal_threshold_pr = thresholds_pr[optimal_idx_pr]
+
+    print("\nThreshold Optimization:")
+    print(f"ROC optimal threshold: {optimal_threshold:.3f}")
+    print(f"PR optimal threshold: {optimal_threshold_pr:.3f}")
+
+    # Make predictions with both thresholds
+    y_pred_roc = (y_pred_proba >= optimal_threshold).astype(int)
+    y_pred_pr = (y_pred_proba >= optimal_threshold_pr).astype(int)
+
+    print("\nMetrics with ROC optimal threshold:")
+    print(classification_report(y_test, y_pred_roc))
+
+    print("\nMetrics with PR optimal threshold:")
+    print(classification_report(y_test, y_pred_pr))
     
     # Get feature importance
     feature_importance = pd.DataFrame({
@@ -139,20 +154,16 @@ def train_model(df):
         'importance': np.abs(best_model.coef_[0])
     }).sort_values('importance', ascending=False)
     
-    return best_model, metrics, feature_importance
+    return best_model, feature_importance
 
 def main():
     # Load and preprocess data
     df = load_and_preprocess_data()
     
     # Train model and get results
-    model, metrics, feature_importance = train_model(df)
+    model, feature_importance = train_model(df)
     
     # Print results
-    print("\nModel Performance Metrics:")
-    for metric, value in metrics.items():
-        print(f"{metric}: {value:.4f}")
-    
     print("\nFeature Importance:")
     print(feature_importance)
     

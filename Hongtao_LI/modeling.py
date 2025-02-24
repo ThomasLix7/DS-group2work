@@ -5,134 +5,176 @@ warnings.filterwarnings('ignore')
 # 1. Data Preparation
 # ======================
 import pandas as pd
-from sklearn.preprocessing import RobustScaler, OneHotEncoder
-from sklearn.compose import ColumnTransformer
+import numpy as np
+from sklearn.preprocessing import StandardScaler, LabelEncoder, RobustScaler
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import Pipeline, make_pipeline
+from sklearn.impute import SimpleImputer
 
-# Load and clean data
+# Load data
 df1 = pd.read_csv("Branch1.csv")
 df2 = pd.read_csv("Branch2.csv")
 df3 = pd.read_csv("Branch3.csv")
-
-# Concatenate the dataframes
 df = pd.concat([df1, df2, df3], ignore_index=True)
-
-# Convert 'Gender' to categorical
-df['Gender'] = df['Gender'].astype('category')
-
-# Handle missing data
-df = df.copy()  # Create a copy to avoid the chained assignment warning
-df = df.dropna()  # Drop any remaining NaN values
-
-# Feature engineering
-df['Score/Age'] = df['Score'] / df['Age']
-df['Products/Balance'] = df['Products_in_Use'] / (df['Balance'] + 1)
-
-# Preprocessing pipeline
-numeric_features = ['Score', 'Age', 'Tenure', 'Salary', 'Balance', 
-                   'Products_in_Use', 'Score/Age', 'Products/Balance']
-categorical_features = ['Gender']
-
-preprocessor = ColumnTransformer([
-    ('num', RobustScaler(), numeric_features),
-    ('cat', OneHotEncoder(drop='first'), categorical_features)
-])
-
-# Split raw data first
-X = df.drop(['Customer_ID', 'Left'], axis=1)  # Removed 'Branch' from drop list since we only use Branch1
-y = df['Left'].values
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, stratify=y, random_state=42
-)
-
-# Convert y to pandas Series
-y_train = pd.Series(y_train)
-y_test = pd.Series(y_test)
+df = df.drop('Customer_ID', axis=1)
 
 # ======================
-# 2. Logistic Regression
+# 2. Logistic Regression (from logistic.py)
 # ======================
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
 
-logit_pipe = Pipeline([
-    ('preprocessor', preprocessor),
-    ('model', LogisticRegression(
-        class_weight='balanced',
-        C=0.1,  # Best value from previous grid search
-        solver='liblinear',  # Best performing solver
-        max_iter=1000
-    ))
-])
+# Logistic preprocessing
+df_logit = df.copy()
+le = LabelEncoder()
+df_logit['Gender'] = le.fit_transform(df_logit['Gender'])
 
-logit_model = logit_pipe.fit(X_train, y_train)
+# Handle missing values
+imputer = SimpleImputer(strategy='median')
+numeric_columns = ['Age', 'Score', 'Tenure', 'Salary', 'Balance', 'Products_in_Use']
+df_logit[numeric_columns] = imputer.fit_transform(df_logit[numeric_columns])
+
+X_logit = df_logit.drop('Left', axis=1)
+y_logit = df_logit['Left']
+
+X_train_logit, X_test_logit, y_train_logit, y_test_logit = train_test_split(
+    X_logit, y_logit, test_size=0.2, random_state=42, stratify=y_logit
+)
+
+# Scale features
+scaler_logit = StandardScaler()
+X_train_logit_scaled = scaler_logit.fit_transform(X_train_logit)
+X_test_logit_scaled = scaler_logit.transform(X_test_logit)
+
+# Train model with best parameters from logistic.py
+logit_model = LogisticRegression(
+    solver='saga',
+    penalty='elasticnet',
+    C=0.001,
+    l1_ratio=0.3,
+    class_weight={0:1, 1:4},
+    max_iter=5000,
+    random_state=42
+).fit(X_train_logit_scaled, y_train_logit)
+
+# Initialize results dictionary
+results = {}
 
 # ======================
-# 3. KNN Implementation
+# 3. KNN Implementation (from knn.py)
 # ======================
 from sklearn.neighbors import KNeighborsClassifier
-from imblearn.pipeline import Pipeline as ImbPipeline
-from imblearn.over_sampling import SMOTE
 
-knn_pipe = ImbPipeline([
-    ('preprocessor', preprocessor),
-    ('smote', SMOTE(sampling_strategy=0.5, random_state=42)),
-    ('model', KNeighborsClassifier(
-        weights='distance',
-        n_neighbors=15,  # Optimal neighbor count
-        metric='euclidean'  # Best performing metric
-    ))
-])
+# KNN preprocessing
+df_knn = df.copy()
+le = LabelEncoder()
+df_knn['Gender'] = le.fit_transform(df_knn['Gender'])
 
-knn_model = knn_pipe.fit(X_train, y_train)
+features_knn = ['Age', 'Score', 'Tenure', 'Salary', 'Balance', 'Products_in_Use', 'Gender']
+X_knn = df_knn[features_knn]
+y_knn = df_knn['Left']
+
+X_train_knn, X_test_knn, y_train_knn, y_test_knn = train_test_split(
+    X_knn, y_knn, test_size=0.2, random_state=42
+)
+
+knn_pipeline = make_pipeline(
+    SimpleImputer(strategy='mean'),
+    StandardScaler(),
+    KNeighborsClassifier(
+        n_neighbors=27,           # Updated from knn.py best parameters
+        weights='distance',       # Updated from knn.py best parameters
+        metric='euclidean',      # Updated from knn.py best parameters
+        p=1                      # Updated from knn.py best parameters
+    )
+)
+
+knn_model = knn_pipeline.fit(X_train_knn, y_train_knn)
 
 # ======================
-# 4. XGBoost Implementation
+# 4. XGBoost Implementation (from xgBoost.py)
 # ======================
 from xgboost import XGBClassifier
 
-xgb_pipe = Pipeline([
-    ('preprocessor', preprocessor),
-    ('model', XGBClassifier(
-        scale_pos_weight=(len(y_train)-sum(y_train))/sum(y_train),
-        learning_rate=0.1,  # Optimal learning rate
-        max_depth=3,  # Best depth from previous search
-        eval_metric='logloss',
-        use_label_encoder=False
-    ))
-])
+# XGBoost preprocessing
+df_xgb = df.copy()
+df_xgb['Salary'].fillna(df_xgb['Salary'].mean(), inplace=True)
+le = LabelEncoder()
+df_xgb['Gender'] = le.fit_transform(df_xgb['Gender'])
 
-xgb_model = xgb_pipe.fit(X_train, y_train)
+features_xgb = ['Age', 'Score', 'Tenure', 'Salary', 'Balance', 'Products_in_Use', 'Gender']
+X_xgb = df_xgb[features_xgb]
+y_xgb = df_xgb['Left']
+
+X_train_xgb, X_test_xgb, y_train_xgb, y_test_xgb = train_test_split(
+    X_xgb, y_xgb, test_size=0.2, random_state=42
+)
+
+xgb_model = XGBClassifier(
+    max_depth=3,           # From xgBoost.py best parameters
+    learning_rate=0.05,    
+    n_estimators=100,      
+    subsample=0.8,      
+    colsample_bytree=1.0,  
+    eval_metric='logloss',
+    random_state=42,
+    use_label_encoder=False
+).fit(X_train_xgb, y_train_xgb)
 
 # ======================
-# 5. Neural Network
+# 5. Neural Network (from nn.py)
 # ======================
 from sklearn.neural_network import MLPClassifier
 
-nn_pipe = Pipeline([
-    ('preprocessor', preprocessor),
-    ('model', MLPClassifier(
-        hidden_layer_sizes=(64, 32),
-        activation='relu',
-        solver='adam',
-        alpha=0.001,  # Optimal regularization
-        learning_rate_init=0.001,  # Best initial learning rate
-        max_iter=1000,
-        early_stopping=True,
-        validation_fraction=0.2,
-        random_state=42,
-        verbose=0
-    ))
-])
+# NN preprocessing
+df_nn = df.copy()
+df_nn['Salary'] = df_nn['Salary'].fillna(df_nn['Salary'].mean())
+df_nn['Tenure'] = df_nn['Tenure'].fillna(df_nn['Tenure'].median())
+df_nn['Score'] = df_nn['Score'].fillna(df_nn['Score'].median())
+df_nn['Balance'] = df_nn['Balance'].fillna(df_nn['Balance'].median())
+df_nn['Products_in_Use'] = df_nn['Products_in_Use'].fillna(df_nn['Products_in_Use'].median())
+df_nn['Age'] = df_nn['Age'].fillna(df_nn['Age'].median())
 
-nn_model = nn_pipe.fit(X_train, y_train)
+le = LabelEncoder()
+df_nn['Gender'] = le.fit_transform(df_nn['Gender'])
+
+features_nn = ['Age', 'Score', 'Tenure', 'Salary', 'Balance', 'Products_in_Use', 'Gender']
+X_nn = df_nn[features_nn]
+y_nn = df_nn['Left']
+
+X_train_nn, X_test_nn, y_train_nn, y_test_nn = train_test_split(
+    X_nn, y_nn, test_size=0.2, random_state=42, stratify=y_nn
+)
+
+scaler_nn = StandardScaler()
+X_train_nn_scaled = scaler_nn.fit_transform(X_train_nn)
+X_test_nn_scaled = scaler_nn.transform(X_test_nn)
+
+nn_model = MLPClassifier(
+    hidden_layer_sizes=(64, 32, 16),  # Updated from best parameters
+    activation='tanh',               
+    solver='adam',
+    alpha=0.1,                        
+    learning_rate_init=0.001,
+    batch_size=128,
+    max_iter=1000,
+    early_stopping=True,
+    validation_fraction=0.2,
+    random_state=42
+).fit(X_train_nn_scaled, y_train_nn)
 
 # ======================
 # 6. Model Evaluation
 # ======================
-from sklearn.metrics import roc_auc_score, classification_report, roc_curve, accuracy_score
-import numpy as np
+from sklearn.metrics import roc_curve
+
+# Dictionary to store test data for each model
+test_data = {
+    'Logistic': (X_test_logit_scaled, y_test_logit),
+    'KNN': (X_test_knn, y_test_knn),
+    'XGBoost': (X_test_xgb, y_test_xgb),
+    'NeuralNet': (X_test_nn_scaled, y_test_nn)
+}
 
 models = {
     'Logistic': logit_model,
@@ -141,23 +183,37 @@ models = {
     'NeuralNet': nn_model
 }
 
-results = {}
 print("\nModel Performance Summary:")
 print("="*50)
 
 for name, model in models.items():
+    # Get corresponding test data
+    X_test_curr, y_test_curr = test_data[name]
+    
     # Get predictions
-    y_pred_proba = model.predict_proba(X_test)[:, 1]
-    y_pred = (y_pred_proba > 0.5).astype(int)
+    if name == 'KNN':
+        y_pred_proba = model.predict_proba(X_test_curr)[:, 1]
+        y_pred = model.predict(X_test_curr)
+    else:
+        y_pred_proba = model.predict_proba(X_test_curr)[:, 1]
+        y_pred = (y_pred_proba > 0.5).astype(int)
     
     # Calculate metrics
-    accuracy = accuracy_score(y_test, y_pred)
-    auc_score = roc_auc_score(y_test, y_pred_proba)
+    accuracy = accuracy_score(y_test_curr, y_pred)
+    auc_score = roc_auc_score(y_test_curr, y_pred_proba)
     
+    # Calculate optimal threshold
+    fpr, tpr, thresholds = roc_curve(y_test_curr, y_pred_proba)
+    j_scores = tpr - fpr
+    optimal_idx = np.argmax(j_scores)
+    optimal_threshold = thresholds[optimal_idx]
+    
+    # Store results
     results[name] = {
         'Accuracy': accuracy,
         'AUC': auc_score,
-        'Classification Report': classification_report(y_test, y_pred)
+        'Classification Report': classification_report(y_test_curr, y_pred),
+        'Optimal Threshold': optimal_threshold
     }
     
     # Print results for each model
@@ -167,65 +223,17 @@ for name, model in models.items():
     print("\nClassification Report:")
     print(results[name]['Classification Report'])
 
-# Calculate optimal thresholds
-optimal_thresholds = {}
-for name in models:
-    y_pred = models[name].predict_proba(X_test)[:, 1]
-    fpr, tpr, thresholds = roc_curve(y_test, y_pred)
-    optimal_idx = np.argmax(tpr - fpr)
-    optimal_thresholds[name] = thresholds[optimal_idx]
-
 # ======================
-# 7. Business Insights
-# ======================
-import shap
-
-# Feature importance analysis
-explainer_xgb = shap.TreeExplainer(xgb_model.named_steps['model'])
-# Convert X_test to numeric before SHAP analysis
-X_test_numeric = X_test.copy()
-X_test_numeric['Gender'] = X_test_numeric['Gender'].cat.codes
-shap_values_xgb = explainer_xgb.shap_values(X_test_numeric)
-
-# ======================
-# 8. Visualization
-# ======================
-import matplotlib.pyplot as plt
-
-# ROC Curves
-plt.figure(figsize=(10,6))
-for name, model in models.items():
-    y_pred = model.predict_proba(X_test)[:, 1]
-    fpr, tpr, _ = roc_curve(y_test, y_pred)
-    auc = roc_auc_score(y_test, y_pred)
-    plt.plot(fpr, tpr, label=f'{name} (AUC = {auc:.2f})')
-
-plt.plot([0,1], [0,1], 'k--')
-plt.xlabel('False Positive Rate')
-plt.ylabel('True Positive Rate')
-plt.title('ROC Curve Comparison')
-plt.legend()
-plt.savefig('roc_comparison.png', dpi=300, bbox_inches='tight')
-
-# SHAP Summary Plot
-plt.figure(figsize=(10,6))
-shap.summary_plot(shap_values_xgb, X_test, feature_names=numeric_features + ['Gender_Male'])
-plt.title('XGBoost Feature Impact')
-plt.savefig('shap_summary.png', dpi=300, bbox_inches='tight')
-
-# ======================
-# 9. Report Generation
+# 7. Report Generation
 # ======================
 def generate_report(results):
     report = {
         'best_model': max(results, key=lambda x: results[x]['AUC']),
         'auc_scores': {k: v['AUC'] for k,v in results.items()},
-        'risk_thresholds': optimal_thresholds,
+        'risk_thresholds': {k: v['Optimal Threshold'] for k,v in results.items()},
         'top_features': {
-            'Logistic': pd.Series(logit_model.named_steps['model'].coef_[0],
-                                 index=logit_model.named_steps['preprocessor'].get_feature_names_out()),
-            'XGBoost': pd.Series(xgb_model.named_steps['model'].feature_importances_,
-                                index=xgb_model.named_steps['preprocessor'].get_feature_names_out())
+            'Logistic': pd.Series(logit_model.coef_[0], index=X_logit.columns),
+            'XGBoost': pd.Series(xgb_model.feature_importances_, index=features_xgb)
         }
     }
     return report
