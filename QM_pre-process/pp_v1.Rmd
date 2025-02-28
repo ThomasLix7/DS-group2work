@@ -1,0 +1,328 @@
+---
+title: "Pre-process_DSF"
+author: '39582833'
+date: "2025-02-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+```{r}
+
+data1  <- read.csv("Branch1.csv")
+data2  <- read.csv("Branch2.csv")
+data3  <- read.csv("Branch3.csv")
+
+```
+
+
+
+```{r}
+#添加特征列Source，表示合并后的数据集来自不同的数据集
+# 为 data1 添加特征列，值为 1
+data1$Source <- 1
+
+# 为 data2 添加特征列，值为 2
+data2$Source <- 2
+
+# 为 data3 添加特征列，值为 3
+data3$Source <- 3
+```
+
+```{r}
+# 合并三个数据框
+data <- rbind(data1, data2, data3)
+```
+
+
+```{r}
+str(data)
+```
+
+
+```{r}
+#查看总体数据
+summary(data)
+```
+
+```{r}
+#性别列转化为数值型： 男性为1，女性为0
+data$Gender <- ifelse(data$Gender == "Male", 1, 0)
+
+```
+
+
+```{r}
+str(data)
+```
+
+
+```{r}
+missing_rows <- sum(!complete.cases(data))  # 统计至少有一个 NA 的行数
+total_rows <- nrow(data)  # 数据集总行数
+missing_percentage <- (missing_rows / total_rows) * 100  # 计算缺失率
+print(paste("至少有一个缺失值的行数:", missing_rows))
+print(paste("缺失值行的比例:", round(missing_percentage, 2), "%"))
+
+if (missing_percentage < 5) {
+  data <- na.omit(data)  # 删除所有包含 NA 的行
+  print("已删除包含 NA 的行。")
+} else {
+  print("缺失值超过 5%，建议填充。")
+}
+
+```
+
+```{r}
+sum(duplicated(data))  # 统计重复行的数量
+```
+
+
+
+```{r}
+duplicate_rows <- data[duplicated(data), ]
+print(duplicate_rows)  # 显示重复值
+
+```
+```{r}
+#删除完全相同的重复行（只保留第一条）
+data <- data[!duplicated(data), ]
+```
+
+
+```{r}
+sum(duplicated(data))  # 统计重复行的数量
+```
+```{r}
+#检查是否为整数
+columns_to_check <- c("Customer_ID", "Age", "Score", "Tenure", "Products_in_Use")
+
+non_integer_count <- sum(sapply(data[columns_to_check], function(col) sum(col != floor(col), na.rm = TRUE)))
+
+print(paste("非整数值的总数量:", non_integer_count))
+
+```
+
+
+```{r}
+
+
+#Salary列表示客户的预计年薪
+#最小值为11.58，我认为这是异常值，但是经过IQR方法显示不是异常值，需要讨论
+
+#Balance列为客户的余额
+#最小值为27288，最大值为214347，但是经过IQR方法显示是异常值，需要讨论
+
+```
+
+
+
+
+
+
+
+```{r}
+df_sorted <- data[order(data$Salary, na.last = NA), ]  # 按 Salary 升序排序
+print(df_sorted)  # 查看结果
+```
+```{r}
+boxplot(data$Salary, main = "Boxplot of Salary", ylab = "Salary", col = "orange")
+
+```
+
+
+```{r}
+# 计算 Salary 的 IQR
+Q1_salary <- quantile(data$Salary, 0.25, na.rm = TRUE)  # 第 1 四分位数
+Q3_salary <- quantile(data$Salary, 0.75, na.rm = TRUE)  # 第 3 四分位数
+IQR_salary <- Q3_salary - Q1_salary  # 计算 IQR
+
+# 计算 Salary 的异常值范围
+lower_bound_salary <- Q1_salary - 1.5 * IQR_salary
+upper_bound_salary <- Q3_salary + 1.5 * IQR_salary
+
+print(lower_bound_salary)
+
+# 找出 Salary 的异常值
+outliers_salary <- data$Salary[data$Salary < lower_bound_salary | data$Salary > upper_bound_salary]
+print("Salary 异常值：")
+print(outliers_salary)
+
+# 筛选出不在异常值范围内的数据
+data <- data[data$Salary >= lower_bound_salary & data$Salary <= upper_bound_salary, ]
+
+# 查看删除异常值后的数据集
+print("删除异常值后的数据集：")
+print(head(data))
+
+```
+```{r}
+hist(data$Salary, probability = TRUE, breaks = 50, main = "Salary Distribution", col = "lightblue")
+lines(density(data$Salary, na.rm = TRUE), col = "red", lwd = 2)
+
+```
+
+
+
+```{r}
+boxplot(data$Balance, main = "Boxplot of Balance", ylab = "Salary", col = "orange")
+
+
+```
+
+```{r}
+# 计算 Balance 的 IQR
+Q1_balance <- quantile(data$Balance, 0.25, na.rm = TRUE)  # 第 1 四分位数
+Q3_balance <- quantile(data$Balance, 0.75, na.rm = TRUE)  # 第 3 四分位数
+IQR_balance <- Q3_balance - Q1_balance  # 计算 IQR
+
+# 计算 Balance 的异常值范围
+lower_bound_balance <- Q1_balance - 1.5 * IQR_balance
+upper_bound_balance <- Q3_balance + 1.5 * IQR_balance
+
+# 找出 Balance 的异常值
+outliers_balance <- data$Balance[data$Balance < lower_bound_balance | data$Balance > upper_bound_balance]
+print("Balance 异常值：")
+print(outliers_balance)
+```
+```{r}
+hist(data$Balance, probability = TRUE, breaks = 50, main = "Balance Distribution", col = "lightblue")
+lines(density(data$Balance, na.rm = TRUE), col = "red", lwd = 2)
+```
+
+```{r}
+# 假设你的数据集名为 data
+count_table <- table(data$Left)
+print(count_table)
+```
+
+
+```{r}
+# 筛选出 Balance 列为 0 的数据
+data_balance_0 <- data[data$Balance == 0, ]
+prop=nrow(data_balance_0)/nrow(data)
+cat("余额为0的账户的占比：", prop, "\n")
+# 统计 Left 列中 1 的数量
+count_1 <- sum(data_balance_0$Left == 1)
+
+# 统计 Left 列中 0 的数量
+count_0 <- sum(data_balance_0$Left == 0)
+# 计算 Left 列中 1 的占比
+prop_1 <- count_1 / (count_1 + count_0)
+
+
+# 计算 Left 列中 0 的占比
+prop_0 <- count_0 / (count_1 + count_0)
+# 输出占比结果
+print(count_1)
+print(count_0)
+cat("Left 列中 1 的占比：", prop_1, "\n")
+cat("Left 列中 0 的占比：", prop_0, "\n")
+```
+
+
+
+
+
+
+
+
+```{r}
+#查看总体数据
+summary(data)
+```
+
+
+```{r}
+# 定义一个函数，用于生成不重复的文件名
+generate_unique_filename <- function(base_name, path) {
+  counter <- 0
+  filename <- paste0(path, base_name)  # 拼接路径和基础文件名
+  while (file.exists(filename)) {
+    counter <- counter + 1
+    # 拼接路径和带编号的文件名
+    filename <- paste0(path, tools::file_path_sans_ext(base_name), "(", counter, ").", tools::file_ext(base_name))
+  }
+  return(filename)
+}
+
+# 基础文件名
+base_name <- "output.csv"
+
+# 指定保存路径（Windows系统中使用正斜杠或双反斜杠）
+output_path <- "output/"  # 或者 "C:/output/" 如果需要指定绝对路径
+
+# 检查路径是否存在，如果不存在则创建
+if (!dir.exists(output_path)) {
+  dir.create(output_path, recursive = TRUE)
+}
+
+# 生成不重复的文件名（传入路径和基础文件名）
+unique_filename <- generate_unique_filename(base_name, output_path)
+
+
+# 保存数据到CSV文件
+write.csv(data, file = unique_filename, row.names = FALSE, quote = FALSE)
+
+# 输出最终保存的文件名
+cat("文件已保存为：", unique_filename, "\n")
+```
+```{r}
+str(data)
+```
+
+
+
+
+```{r}
+pca <- prcomp(data[,-c(1,9)], scale. = TRUE)
+pca
+```
+
+
+```{r}
+pca$sdev^2/sum(pca$sdev^2)
+
+```
+
+
+
+```{r}
+cumsum(pca$sdev^2)/sum(pca$sdev^2)
+
+```
+
+
+
+```{r}
+ pve1=cumsum(pca$sdev^2)/sum(pca$sdev^2)
+ plot(pve1,t="b",col="blue",xlab="PC", xaxp=c(1,6,5),
+ main="Proportionofvarianceexplained",ylab="")
+ abline(h = 0.85, col = "red", lty = 2, lwd = 2)
+ text(2, 0.88, "85% Variance Explained", col = "red")
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+# 假设你的数据集名为 data
+count_table <- table(data$Left)
+print(count_table)
+```
+
+
+
+
+
+
+
+
