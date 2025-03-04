@@ -1,37 +1,14 @@
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, roc_curve, precision_recall_curve, classification_report
-from sklearn.impute import SimpleImputer
+from sklearn.metrics import roc_curve, precision_recall_curve, classification_report
 
 def load_and_preprocess_data():
-    # Load data from all branches
-    df1 = pd.read_csv('Branch1.csv')
-    df2 = pd.read_csv('Branch2.csv')
-    df3 = pd.read_csv('Branch3.csv')
-    
-    # Combine all branches
-    df = pd.concat([df1, df2, df3], ignore_index=True)
-    
-    # Drop Customer_ID as it's not relevant for prediction
-    df = df.drop('Customer_ID', axis=1)
-    
-    # Convert Gender to numerical
-    le = LabelEncoder()
-    df['Gender'] = le.fit_transform(df['Gender'])
-    
-    # Handle missing values
-    imputer = SimpleImputer(strategy='median')
-    numeric_columns = ['Age', 'Score', 'Tenure', 'Salary', 'Balance', 'Products_in_Use']
-    df[numeric_columns] = imputer.fit_transform(df[numeric_columns])
-    
-    print("\nFeature Statistics:")
-    print(df.describe())
-    
-    print("\nClass Distribution:")
-    print(df['Left'].value_counts(normalize=True))
+    # Load data
+    df = pd.read_csv("QM_pre-process/output.csv")
+    df = df.drop(['Customer_ID', 'Source'], axis=1)
     
     return df
 
@@ -39,16 +16,15 @@ def train_model(df):
     # Separate features and target
     X = df.drop('Left', axis=1)
     y = df['Left']
-    
     # Split the data
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     
-    # Scale the features
+    # Normalize the features
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
     
-    # Define different solver-penalty combinations to try
+    # Define different solver-penalty combinations to search for the best model parameters
     solvers_penalties = [
         ('lbfgs', 'l2'),     # Efficient for large datasets
         ('newton-cg', 'l2'), # Good for multinomial loss

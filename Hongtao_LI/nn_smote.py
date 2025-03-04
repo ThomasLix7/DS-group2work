@@ -13,36 +13,19 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.inspection import permutation_importance
 from sklearn.utils.class_weight import compute_sample_weight
 
-# Load data from all branches
-df1 = pd.read_csv('Branch1.csv')
-df2 = pd.read_csv('Branch2.csv')
-df3 = pd.read_csv('Branch3.csv')
-
-# Combine all branches
-df = pd.concat([df1, df2, df3], ignore_index=True)
-
-# Handle missing values (new way)
-df['Salary'] = df['Salary'].fillna(df['Salary'].mean())
-df['Tenure'] = df['Tenure'].fillna(df['Tenure'].median())
-df['Score'] = df['Score'].fillna(df['Score'].median())
-df['Balance'] = df['Balance'].fillna(df['Balance'].median())
-df['Products_in_Use'] = df['Products_in_Use'].fillna(df['Products_in_Use'].median())
-df['Age'] = df['Age'].fillna(df['Age'].median())
-
-# Encode categorical variables
-le = LabelEncoder()
-df['Gender'] = le.fit_transform(df['Gender'])
+# Load and preprocess data
+df = pd.read_csv("QM_pre-process/output.csv")
+df = df.drop(['Customer_ID', 'Source'], axis=1)
 
 # Prepare features (X) and target (y)
-features = ['Age', 'Score', 'Tenure', 'Salary', 'Balance', 'Products_in_Use', 'Gender']
-X = df[features]
+X = df.drop('Left', axis=1)
 y = df['Left']
 
 # Split the data
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, 
     test_size=0.2, 
-    random_state=42,
+    random_state=17,
     stratify=y  # Maintain class distribution in splits
 )
 
@@ -53,9 +36,9 @@ X_test_scaled = scaler.transform(X_test)
 
 # Modify param_grid to include stronger regularization
 param_grid = {
-    'hidden_layer_sizes': [(32,16), (64,32), (64,32,16)],  # Try smaller networks
+    'hidden_layer_sizes': [(64,32), (64,32,16), (128,64,32)], 
     'activation': ['relu', 'tanh'],
-    'alpha': [0.001, 0.01, 0.1],  # Increase regularization strength
+    'alpha': [0.001, 0.01],  # Increase regularization strength
     'learning_rate_init': [0.001, 0.01],
     'batch_size': [128, 256]
 }
@@ -118,7 +101,7 @@ result = permutation_importance(
 
 # Plot feature importance
 importance_df = pd.DataFrame({
-    'Feature': features,
+    'Feature': X.columns,
     'Importance': result.importances_mean
 })
 importance_df = importance_df.sort_values('Importance', ascending=True)

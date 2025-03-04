@@ -1,34 +1,14 @@
 import pandas as pd
-import numpy as np
 from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.preprocessing import StandardScaler, LabelEncoder
 import xgboost as xgb
 from sklearn.metrics import accuracy_score, classification_report
 
-# Read the CSV file
-df1 = pd.read_csv('Branch1.csv')
-df2 = pd.read_csv('Branch2.csv')
-df3 = pd.read_csv('Branch3.csv')
-
-# Print data distribution before combining
-print("\nData distribution in branches:")
-print(f"Branch1 Left=1: {df1['Left'].mean():.2%}")
-print(f"Branch2 Left=1: {df2['Left'].mean():.2%}")
-print(f"Branch3 Left=1: {df3['Left'].mean():.2%}")
-
-    # Combine all branches
-df = pd.concat([df1, df2, df3], ignore_index=True)
-
-# Handle missing values
-df['Salary'].fillna(df['Salary'].mean(), inplace=True)
-
-# Encode categorical variables
-le = LabelEncoder()
-df['Gender'] = le.fit_transform(df['Gender'])
+# Load and preprocess data
+df = pd.read_csv("QM_pre-process/output.csv")
+df = df.drop(['Customer_ID', 'Source'], axis=1)
 
 # Prepare features (X) and target (y)
-features = ['Age', 'Score', 'Tenure', 'Salary', 'Balance', 'Products_in_Use', 'Gender']
-X = df[features]
+X = df.drop('Left', axis=1)
 y = df['Left']
 
 # Split the data
@@ -70,7 +50,7 @@ print(classification_report(y_test, y_pred))
 
 # Print feature importance
 feature_importance = pd.DataFrame({
-    'Feature': features,
+    'Feature': X.columns,
     'Importance': model.feature_importances_
 })
 print("\nFeature Importance:")

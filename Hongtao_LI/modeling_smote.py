@@ -5,6 +5,8 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
+from imblearn.over_sampling import SMOTE
 
 # Load and prepare dataset
 df = pd.read_csv("QM_pre-process/output.csv")
@@ -27,40 +29,44 @@ scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
+# Apply SMOTE for models that need it
+smote = SMOTE(random_state=17)
+X_train_smote, y_train_smote = smote.fit_resample(X_train_scaled, y_train)
+
+# Initialize dictionaries to store models and results
+models = {}
+results = {}
+
 # ======================
-# 2. Logistic Regression (from logistic.py)
+# 2. Logistic Regression (with class weights, no SMOTE)
 # ======================
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
 
-# Train model with best parameters from logistic.py
+# Train model with best parameters and class weights
 logit_model = LogisticRegression(
     solver='saga',
     penalty='elasticnet',
     C=0.001,
     l1_ratio=0.3,
-    class_weight={0:1, 1:4},
+    class_weight={0:1, 1:4},  # Using class weights instead of SMOTE
     max_iter=5000,
     random_state=17
-).fit(X_train_scaled, y_train)
-
-# Initialize results dictionary
-results = {}
+).fit(X_train_scaled, y_train)  # Using original data, not SMOTE
 
 # ======================
-# 3. KNN Implementation (from knn.py)
+# 3. KNN with SMOTE
 # ======================
 from sklearn.neighbors import KNeighborsClassifier
 
 knn_model = KNeighborsClassifier(
-        n_neighbors=15,           # Updated from knn.py best parameters
-        weights='uniform',       # Updated from knn.py best parameters
-        metric='manhattan',      # Updated from knn.py best parameters
-        p=1                      # Updated from knn.py best parameters
-    ).fit(X_train_scaled, y_train)
+    n_neighbors=7,
+    weights='distance',
+    metric='manhattan',
+    p=1
+).fit(X_train_smote, y_train_smote)
 
 # ======================
-# 4. XGBoost Implementation (from xgBoost.py)
+# 4. XGBoost (no SMOTE, using scale_pos_weight)
 # ======================
 from xgboost import XGBClassifier
 
@@ -68,34 +74,34 @@ from xgboost import XGBClassifier
 scale_pos_weight = len(y[y==0]) / len(y[y==1])
 
 xgb_model = XGBClassifier(
-    max_depth=4,           # From xgBoost.py best parameters
-    learning_rate=0.01,    
-    n_estimators=200,      
-    subsample=0.8,      
-    colsample_bytree=1.0,  
-    eval_metric='logloss',
+    max_depth=4,
+    learning_rate=0.01,
+    n_estimators=200,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    eval_metric='auc',
     random_state=17,
     use_label_encoder=False,
     scale_pos_weight=scale_pos_weight
-).fit(X_train, y_train)
+).fit(X_train_scaled, y_train)  # Using original data, not SMOTE
 
 # ======================
-# 5. Neural Network (from nn.py)
+# 5. Neural Network with SMOTE
 # ======================
 from sklearn.neural_network import MLPClassifier
 
 nn_model = MLPClassifier(
-    hidden_layer_sizes=(128, 64, 32),  # Updated from best parameters
+    hidden_layer_sizes=(128, 64, 32),  # Updated from best parameters of nn_smote.py
     activation='tanh',               
     solver='adam',
     alpha=0.01,                        
-    learning_rate_init=0.001,
-    batch_size=128,
+    learning_rate_init=0.01,
+    batch_size=256,
     max_iter=1000,
     early_stopping=True,
     validation_fraction=0.2,
     random_state=17
-).fit(X_train_scaled, y_train)
+).fit(X_train_smote, y_train_smote)
 
 # ======================
 # 6. Model Evaluation
@@ -106,7 +112,7 @@ from sklearn.metrics import roc_curve
 test_data = {
     'Logistic': (X_test_scaled, y_test),
     'KNN': (X_test_scaled, y_test),
-    'XGBoost': (X_test, y_test),
+    'XGBoost': (X_test_scaled, y_test),
     'NeuralNet': (X_test_scaled, y_test)
 }
 
