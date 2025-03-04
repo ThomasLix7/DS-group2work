@@ -75,7 +75,6 @@ xgb_model = XGBClassifier(
     colsample_bytree=1.0,  
     eval_metric='logloss',
     random_state=17,
-    use_label_encoder=False,
     scale_pos_weight=scale_pos_weight
 ).fit(X_train, y_train)
 

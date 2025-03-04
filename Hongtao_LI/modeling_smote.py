@@ -81,7 +81,6 @@ xgb_model = XGBClassifier(
     colsample_bytree=0.8,
     eval_metric='auc',
     random_state=17,
-    use_label_encoder=False,
     scale_pos_weight=scale_pos_weight
 ).fit(X_train_scaled, y_train)  # Using original data, not SMOTE
 
