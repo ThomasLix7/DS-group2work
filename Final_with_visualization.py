@@ -333,7 +333,7 @@ plt.show()
 sns.set_style("whitegrid")
 
 # Low-saturation candy colors
-candy_colors = ["#FADADD", "#B5EAD7", "#FFDAC1", "#C7CEEA", "#D5AAFF", "#A2D2FF"]
+candy_colors = ["#AFD3E7", "#FCA3A3", "#ED5F5F", "#FFA74F", "#D0BBDB", "#9A72C7"]
 
 plt.figure(figsize=(8, 6))
 
@@ -385,7 +385,7 @@ plt.show()
 # ======================
 sns.set_style("whitegrid")
 
-candy_palette = ["#FADADD", "#B5EAD7", "#FFDAC1", "#C7CEEA", "#D5AAFF", "#A2D2FF"]
+candy_palette = ["#AFD3E7", "#FCA3A3", "#ED5F5F", "#FFA74F", "#D0BBDB", "#9A72C7"]
 
 # Calculating the AUC score
 auc_scores = {name: results[name]['AUC'] for name in models}
@@ -410,50 +410,124 @@ sns.despine()
 plt.show()
 
 # ======================
-# 6. Logistic regression feature weights
+# 6. Models feature weights
 # ======================
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import numpy as np
+
+# Setting the Seaborn style
 sns.set_style("whitegrid")
 
-candy_palette = ["#FADADD", "#B5EAD7", "#FFDAC1", "#C7CEEA", "#D5AAFF", "#A2D2FF"]
+# colour scheme
+candy_palette = ["#AFD3E7", "#FCA3A3", "#ED5F5F", "#FFA74F", "#D0BBDB", "#9A72C7"]
 
-# Obtain and rank logistic regression coefficients
+# Creating Submaps
+fig, axes = plt.subplots(1, 3, figsize=(18, 5))  # 3 models, 1 row, 3 columns
+
+# ========== Logistic Regression ==========
 logit_weights = pd.Series(logit_model.coef_[0], index=X_logit.columns).sort_values()
+ax1 = axes[0]
+ax1.barh(logit_weights.index, logit_weights.values, color=candy_palette[:len(logit_weights)])
+ax1.set_title("Logistic Regression Feature Importance", fontsize=14, fontweight='bold')
+ax1.set_xlabel("Coefficient Value", fontsize=12)
+ax1.set_ylabel("Features", fontsize=12)
+for i, v in enumerate(logit_weights.values):
+    ax1.text(v, i, f'{v:.3f}', ha='left', va='center', fontsize=11, color='dimgray')
 
-plt.figure(figsize=(8, 5))
+# ========== XGBoost ==========
+xgb_weights = pd.Series(xgb_model.feature_importances_, index=X_xgb.columns).sort_values()
+ax2 = axes[1]
+ax2.barh(xgb_weights.index, xgb_weights.values, color=candy_palette[:len(xgb_weights)])
+ax2.set_title("XGBoost Feature Importance", fontsize=14, fontweight='bold')
+ax2.set_xlabel("Feature Importance Score", fontsize=12)
+ax2.set_ylabel("Features", fontsize=12)
+for i, v in enumerate(xgb_weights.values):
+    ax2.text(v, i, f'{v:.3f}', ha='left', va='center', fontsize=11, color='dimgray')
 
-ax = logit_weights.plot(kind='barh', color=candy_palette[:len(logit_weights)],
-                        alpha=0.9, edgecolor="gray")
+# ========== Neural Network ==========
+nn_weights = pd.Series(np.abs(nn_model.coefs_[0]).sum(axis=1), index=X_nn.columns).sort_values()
+ax3 = axes[2]
+ax3.barh(nn_weights.index, nn_weights.values, color=candy_palette[:len(nn_weights)])
+ax3.set_title("Neural Network Feature Importance", fontsize=14, fontweight='bold')
+ax3.set_xlabel("Summed Absolute Weight", fontsize=12)
+ax3.set_ylabel("Features", fontsize=12)
+for i, v in enumerate(nn_weights.values):
+    ax3.text(v, i, f'{v:.3f}', ha='left', va='center', fontsize=11, color='dimgray')
 
-for p in ax.patches:
-    plt.text(p.get_width(), p.get_y() + p.get_height()/2,
-             f'{p.get_width():.3f}',
-             ha='left', va='center', fontsize=11, color='dimgray')
-
-plt.title("Logistic Regression Feature Importance", fontsize=14, fontweight='bold')
-plt.xlabel("Coefficient Value", fontsize=12)
-plt.ylabel("Features", fontsize=12)
-
+# Restructuring of the layout
+plt.tight_layout()
 sns.despine()
 
+# Show image
 plt.show()
 
+# ========================
+# 1. SHAP Summary Plot (Global Importance)
+# ========================
 # SHAP
 # Calculate the SHAP value (using XGBoost as an example)
 explainer = shap.Explainer(xgb_model, X_test_xgb)
 shap_values = explainer(X_test_xgb)
 
-# ========================
-# 1. SHAP Summary Plot (Global Importance)
-# ========================
 plt.figure(figsize=(10, 6))
 shap.summary_plot(shap_values, X_test_xgb)
+
+'''
+import shap
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Compute SHAP interpreter
+explainer_logit = shap.Explainer(logit_model, X_test_logit_scaled)
+shap_values_logit = explainer_logit(X_test_logit_scaled)
+
+explainer_knn = shap.Explainer(knn_model.predict_proba, X_test_knn)
+shap_values_knn = explainer_knn(X_test_knn)
+
+explainer_xgb = shap.Explainer(xgb_model, X_test_xgb)
+shap_values_xgb = explainer_xgb(X_test_xgb)
+
+# Fix for MLPClassifier (convert NumPy)
+X_test_nn_array = np.array(X_test_nn_scaled)
+explainer_nn = shap.Explainer(nn_model.predict_proba, X_test_nn_array)
+shap_values_nn = explainer_nn(X_test_nn_array)
+
+# Creating subgraphs: 2 rows and 2 columns
+fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+
+# ========== Logistic Regression SHAP ==========
+plt.sca(axes[0, 0])
+shap.summary_plot(shap_values_logit, X_test_logit_scaled, show=False)
+axes[0, 0].set_title("Logistic Regression SHAP Summary")
+
+# ========== KNN SHAP ==========
+plt.sca(axes[0, 1])
+shap.summary_plot(shap_values_knn, X_test_knn, show=False)
+axes[0, 1].set_title("KNN SHAP Summary")
+
+# ========== XGBoost SHAP ==========
+plt.sca(axes[1, 0])
+shap.summary_plot(shap_values_xgb, X_test_xgb, show=False)
+axes[1, 0].set_title("XGBoost SHAP Summary")
+
+# ========== Neural Network SHAP ==========
+plt.sca(axes[1, 1])
+shap.summary_plot(shap_values_nn, X_test_nn_array, show=False)
+axes[1, 1].set_title("Neural Network SHAP Summary")
+
+# Adjustment of subgraph layout
+plt.tight_layout()
+plt.show()
+'''
 
 # ========================
 # 2. SHAP Bar Plot (Characteristic Importance Bar Plot)
 # ========================
 sns.set_style("whitegrid")
 
-candy_palette = ["#FADADD", "#B5EAD7", "#FFDAC1", "#C7CEEA", "#D5AAFF", "#A2D2FF"]
+candy_palette = ["#AFD3E7", "#FCA3A3", "#ED5F5F", "#FFA74F", "#D0BBDB", "#9A72C7"]
 
 plt.figure(figsize=(8, 6))
 
@@ -469,13 +543,6 @@ sns.despine()
 plt.show()
 
 # ========================
-# 3. SHAP Force Plot (Single Sample Interpretation)
-# ========================
-shap.initjs()
-sample_idx = 10
-shap.force_plot(explainer.expected_value, shap_values[sample_idx].values, X_test_xgb.iloc[sample_idx])
-
-# ========================
 # 4. SHAP Dependence Plot (feature dependencies)
 # ========================
 shap.dependence_plot("Salary", shap_values.values, X_test_xgb)
@@ -484,10 +551,181 @@ shap.dependence_plot("Salary", shap_values.values, X_test_xgb)
 # 5. SHAP Decision Plot
 # ========================
 shap.decision_plot(explainer.expected_value, shap_values.values[:10], X_test_xgb.iloc[:10])
-
 plt.show()
+
+shap.initjs()
+sample_idx = 10
 
 # SHAO Force Plot
 force_plot = shap.force_plot(explainer.expected_value, shap_values[sample_idx].values, X_test_xgb.iloc[sample_idx])
 # Saving SHAP tries as HTML files
 shap.save_html("shap_force_plot.html", force_plot)
+
+
+# ========================
+# 1. Precision-Recall curves
+# ========================
+import matplotlib.pyplot as plt
+from sklearn.metrics import precision_recall_curve, average_precision_score
+
+# Defining colours
+colors = ["#AFD3E7", "#FCA3A3", "#ED5F5F", "#FFA74F", "#D0BBDB"]
+model_names = ['Logistic', 'KNN', 'XGBoost', 'NeuralNet']
+
+# Creating PR Graphs
+plt.figure(figsize=(10, 6))
+
+for i, model_name in enumerate(model_names):
+    X_test_curr, y_test_curr = test_data[model_name]
+    model = models[model_name]
+
+    # 计算 Precision-Recall
+    y_pred_proba = model.predict_proba(X_test_curr)[:, 1]
+    precision, recall, _ = precision_recall_curve(y_test_curr, y_pred_proba)
+    avg_precision = average_precision_score(y_test_curr, y_pred_proba)
+
+    # plot
+    plt.plot(recall, precision, color=colors[i], lw=2,
+             label=f"{model_name} (AP={avg_precision:.2f})")
+
+# Image Settings
+plt.xlabel("Recall")
+plt.ylabel("Precision")
+plt.title("Precision-Recall Curves")
+plt.legend(loc="best")
+plt.grid(True)
+
+# Show image
+plt.show()
+
+# ========================
+# 2. Model calibration assessment
+# ========================
+from sklearn.calibration import calibration_curve
+
+# colour scheme
+colors = ["#AFD3E7", "#FCA3A3", "#ED5F5F", "#FFA74F", "#D0BBDB"]
+
+# Creating calibration graphs
+plt.figure(figsize=(10, 6))
+
+for i, model_name in enumerate(['Logistic', 'KNN', 'XGBoost', 'NeuralNet']):
+    X_test_curr, y_test_curr = test_data[model_name]
+    model = models[model_name]
+
+    # Obtaining Predictive Probabilities
+    y_pred_proba = model.predict_proba(X_test_curr)[:, 1]
+
+    # Calculation of calibration curves
+    prob_true, prob_pred = calibration_curve(y_test_curr, y_pred_proba, n_bins=10)
+
+    # Plotting calibration curves, using specified colours
+    plt.plot(prob_pred, prob_true, marker='o', label=f"{model_name}", color=colors[i])
+
+# Plotting perfectly calibrated lines (y=x lines)
+plt.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfectly Calibrated")
+
+# Image Settings
+plt.xlabel("Predicted Probability")
+plt.ylabel("True Probability")
+plt.title("Model Calibration Plot")
+plt.legend(loc="best")
+plt.grid(True)
+
+# Show image
+plt.show()
+
+# ========================
+# 3. Statistical significance testing
+# ========================
+from scipy.stats import ttest_ind
+
+# Storing the predicted probabilities of different models
+model_probs = {}
+for model_name in model_names:
+    X_test_curr, y_test_curr = test_data[model_name]
+    model = models[model_name]
+    model_probs[model_name] = model.predict_proba(X_test_curr)[:, 1]
+
+# Statistical significance test (t-test) was performed
+stat_results = {}
+model_list = list(model_probs.keys())
+
+for i in range(len(model_list)):
+    for j in range(i + 1, len(model_list)):
+        model1, model2 = model_list[i], model_list[j]
+        stat, p_value = ttest_ind(model_probs[model1], model_probs[model2])
+        stat_results[f"{model1} vs {model2}"] = p_value
+
+# Convert statistical test results into a DataFrame and display it
+import pandas as pd
+stat_results_df = pd.DataFrame(stat_results.items(), columns=["Model Comparison", "p-value"])
+
+# Show results
+print("Statistical Significance Testing Results:")
+print(stat_results_df)
+
+# ========================
+# 4. Learning curve
+# ========================
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import learning_curve
+
+# Uniform colour scheme
+train_color = "#AFD3E7"
+test_color = "#ED5F5F"
+
+# Training data and model dictionary
+test_data = {
+    'Logistic': (X_train_logit_scaled, y_train_logit),
+    'KNN': (X_train_knn, y_train_knn),
+    'XGBoost': (X_train_xgb, y_train_xgb),
+    'NeuralNet': (X_train_nn_scaled, y_train_nn)
+}
+
+models = {
+    'Logistic': logit_model,
+    'KNN': knn_model,
+    'XGBoost': xgb_model,
+    'NeuralNet': nn_model
+}
+
+# Creating Learning Curves
+fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+axes = axes.ravel()  # Flatten the 2x2 subgraphs into a 1-dimensional array.
+
+for i, (model_name, model) in enumerate(models.items()):
+    X_train_curr, y_train_curr = test_data[model_name]
+
+    # Calculating the learning curve
+    train_sizes, train_scores, test_scores = learning_curve(
+        model, X_train_curr, y_train_curr, cv=5, scoring="accuracy", train_sizes=np.linspace(0.1, 1.0, 10)
+    )
+
+    # Calculate mean and standard deviation
+    train_mean = np.mean(train_scores, axis=1)
+    train_std = np.std(train_scores, axis=1)
+    test_mean = np.mean(test_scores, axis=1)
+    test_std = np.std(test_scores, axis=1)
+
+    # Training curve (uniform light blue)
+    axes[i].plot(train_sizes, train_mean, 'o-', label="Training Score", color=train_color)
+    axes[i].fill_between(train_sizes, train_mean - train_std, train_mean + train_std, alpha=0.1, color=train_color)
+
+    # Test Curve (uniform red, dashed line)
+    axes[i].plot(train_sizes, test_mean, 'o-', label="Cross-validation Score", color=test_color, linestyle="dashed")
+    axes[i].fill_between(train_sizes, test_mean - test_std, test_mean + test_std, alpha=0.1, color=test_color)
+
+    # Image Settings
+    axes[i].set_title(f"{model_name} Learning Curve")
+    axes[i].set_xlabel("Training Samples")
+    axes[i].set_ylabel("Accuracy")
+    axes[i].legend(loc="best")
+    axes[i].grid(True)
+
+# Restructuring of the layout
+plt.tight_layout()
+plt.show()
+
+
