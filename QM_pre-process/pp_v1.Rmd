@@ -37,6 +37,10 @@ data3$Source <- 3
 ```{r}
 # 合并三个数据框
 data <- rbind(data1, data2, data3)
+
+```
+```{r}
+
 ```
 
 
@@ -122,7 +126,18 @@ print(paste("非整数值的总数量:", non_integer_count))
 
 
 
+```{r}
+#统计score列大于850的数量
+count_above_850 <- sum(data$Score > 850)
 
+# 打印结果
+print(count_above_850)
+```
+
+```{r}
+# 删除 Score 列值大于 850 的所有行
+data <- data[data$Score <= 850, ]
+```
 
 
 
