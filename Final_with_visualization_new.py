@@ -11,21 +11,12 @@ warnings.filterwarnings('ignore')
 # ======================
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler, LabelEncoder, RobustScaler
-from sklearn.pipeline import Pipeline, make_pipeline
-from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, roc_auc_score, classification_report, recall_score
-from imblearn.over_sampling import SMOTE
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
 import shap
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 # Load and prepare dataset
-df = pd.read_csv("QM_pre-process/output.csv")
+df = pd.read_csv("output.csv")
 df = df.drop(['Customer_ID', 'Source'], axis=1)
 
 # Prepare features (X) and target (y)
@@ -45,38 +36,40 @@ scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
-# Initialize dictionaries to store models and results
-models = {}
-results = {}
+# ======================
+# 2. Logistic Regression (from logistic.py)
+# ======================
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
 
-# ======================
-# 2. Logistic Regression (with class weights, no SMOTE)
-# ======================
-# Train model with best parameters and class weights
+# Train model with best parameters from logistic.py
 logit_model = LogisticRegression(
     solver='saga',
     penalty='elasticnet',
     C=0.001,
     l1_ratio=0.3,
-    class_weight={0: 1, 1: 4},  # Using class weights instead of SMOTE
+    class_weight={0: 1, 1: 4},
     max_iter=5000,
     random_state=17
-).fit(X_train_scaled, y_train)  # Using original data, not SMOTE
+).fit(X_train_scaled, y_train)
+
+# Initialize results dictionary
+results = {}
 
 # ======================
-# 3. KNN Implementation
+# 3. KNN Implementation (from knn.py)
 # ======================
 from sklearn.neighbors import KNeighborsClassifier
 
 knn_model = KNeighborsClassifier(
-    n_neighbors=33,
-    weights='distance',
-    metric='manhattan',
-    p=1
-).fit(X_train_scaled, y_train)  # Using scaled data, not SMOTE
+    n_neighbors=29,  # Updated from knn.py best parameters
+    weights='uniform',  # Updated from knn.py best parameters
+    metric='manhattan',  # Updated from knn.py best parameters
+    p=1  # Updated from knn.py best parameters
+).fit(X_train_scaled, y_train)
 
 # ======================
-# 4. XGBoost (no SMOTE, using scale_pos_weight)
+# 4. XGBoost Implementation (from xgBoost.py)
 # ======================
 from xgboost import XGBClassifier
 
@@ -84,23 +77,23 @@ from xgboost import XGBClassifier
 scale_pos_weight = len(y[y == 0]) / len(y[y == 1])
 
 xgb_model = XGBClassifier(
-    max_depth=3,
-    learning_rate=0.1,
+    max_depth=5,  # From xgBoost.py best parameters
+    learning_rate=0.05,
     n_estimators=100,
-    subsample=0.8,
+    subsample=1.0,
     colsample_bytree=0.8,
-    eval_metric='auc',
+    eval_metric='logloss',
     random_state=17,
     scale_pos_weight=scale_pos_weight
-).fit(X_train, y_train)  # Using raw data, not scaled
+).fit(X_train, y_train)
 
 # ======================
-# 5. Neural Network
+# 5. Neural Network (from nn.py)
 # ======================
 from sklearn.neural_network import MLPClassifier
 
 nn_model = MLPClassifier(
-    hidden_layer_sizes=(64, 32),
+    hidden_layer_sizes=(64, 32),  # Updated from best parameters
     activation='tanh',
     solver='adam',
     alpha=0.1,
@@ -110,7 +103,7 @@ nn_model = MLPClassifier(
     early_stopping=True,
     validation_fraction=0.2,
     random_state=17
-).fit(X_train_scaled, y_train)  # Using scaled data, not SMOTE
+).fit(X_train_scaled, y_train)
 
 # ======================
 # 6. Model Evaluation
@@ -138,16 +131,16 @@ print("=" * 50)
 for name, model in models.items():
     # Get corresponding test data
     X_test_curr, y_test_curr = test_data[name]
-    
+
     # Get predictions
     y_pred_proba = model.predict_proba(X_test_curr)[:, 1]
-    
+
     # Calculate optimal threshold
     fpr, tpr, thresholds = roc_curve(y_test_curr, y_pred_proba)
     j_scores = tpr - fpr
     optimal_idx = np.argmax(j_scores)
     optimal_threshold = thresholds[optimal_idx]
-    
+
     # Handle KNN differently as in the original code
     if name == 'KNN':
         # For KNN, use its native predict method as it has its own decision boundary logic
@@ -159,12 +152,12 @@ for name, model in models.items():
         # For other models, use both default and optimal thresholds
         y_pred_default = (y_pred_proba > 0.5).astype(int)
         y_pred_optimal = (y_pred_proba >= optimal_threshold).astype(int)
-    
+
     # Calculate metrics using appropriate predictions
     accuracy_default = accuracy_score(y_test_curr, y_pred_default)
     accuracy_optimal = accuracy_score(y_test_curr, y_pred_optimal)
     auc_score = roc_auc_score(y_test_curr, y_pred_proba)  # AUC is independent of threshold
-    
+
     # Store results with optimal threshold metrics
     results[name] = {
         'Accuracy': accuracy_optimal,
@@ -172,7 +165,7 @@ for name, model in models.items():
         'Classification Report': classification_report(y_test_curr, y_pred_optimal),
         'Optimal Threshold': optimal_threshold
     }
-    
+
     # Print results for each model
     print(f"\n{name} Results:")
     print(f"Optimal Threshold: {optimal_threshold:.3f}")
@@ -215,6 +208,12 @@ print(f"\nTop Features Importance:")
 for model in ['Logistic', 'XGBoost']:
     print(f"\n{model} Feature Importance:")
     print(final_report['top_features'][model].sort_values(ascending=False))
+
+
+
+
+
+
 
 # ======================
 # 1. Data Distribution Visualization
@@ -314,17 +313,11 @@ fig, axes = plt.subplots(1, len(models), figsize=(15, 4))
 
 for i, (name, model) in enumerate(models.items()):
     X_test_curr, y_test_curr = test_data[name]
-    
-    # Get predictions using optimal threshold
-    y_pred_proba = model.predict_proba(X_test_curr)[:, 1]
-    optimal_threshold = results[name]['Optimal Threshold']
-    
-    # Use optimal threshold for predictions
-    y_pred = (y_pred_proba >= optimal_threshold).astype(int)
+    y_pred = model.predict(X_test_curr)
 
     cm = confusion_matrix(y_test_curr, y_pred)
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=axes[i])
-    axes[i].set_title(f'Confusion Matrix - {name}\n(Threshold: {optimal_threshold:.3f})')
+    axes[i].set_title(f'Confusion Matrix - {name}')
     axes[i].set_xlabel('Predicted')
     axes[i].set_ylabel('Actual')
 
@@ -409,34 +402,29 @@ plt.show()
 # 7. SHAP Summary Plot (Global Importance)
 # ========================
 # Calculating the SHAP value
-X_test_xgb, y_test_xgb = test_data['XGBoost']
-explainer = shap.Explainer(xgb_model, X_test_xgb)
-shap_values = explainer(X_test_xgb)
+explainer = shap.Explainer(xgb_model, X_test)
+shap_values = explainer(X_test)
 
 # Plot SHAP
 plt.figure(figsize=(10, 6))
-shap.summary_plot(shap_values, X_test_xgb, feature_names=X.columns)
+shap.summary_plot(shap_values, X_test, feature_names=X.columns)
 
 '''
 All models are time-consuming to compute SHAP, 
 and only the XGBoost model was chosen as a representative for the computations
 
-# Compute SHAP for all models
-X_test_logit, y_test_logit = test_data['Logistic']
-explainer_logit = shap.Explainer(logit_model, X_test_logit)
-shap_values_logit = explainer_logit(X_test_logit)
+# Compute SHAP
+explainer_logit = shap.Explainer(logit_model, X_test_scaled)
+shap_values_logit = explainer_logit(X_test_scaled)
 
-X_test_knn, y_test_knn = test_data['KNN']
-explainer_knn = shap.Explainer(knn_model.predict_proba, X_test_knn)
-shap_values_knn = explainer_knn(X_test_knn)
+explainer_knn = shap.Explainer(knn_model.predict_proba, X_test_scaled)
+shap_values_knn = explainer_knn(X_test_scaled)
 
-X_test_xgb, y_test_xgb = test_data['XGBoost']
-explainer_xgb = shap.Explainer(xgb_model, X_test_xgb)
-shap_values_xgb = explainer_xgb(X_test_xgb)
+explainer_xgb = shap.Explainer(xgb_model, X_test_scaled)
+shap_values_xgb = explainer_xgb(X_test_scaled)
 
 # Fix MLPClassifier (make sure data is converted to NumPy arrays)
-X_test_nn, y_test_nn = test_data['NeuralNet']
-X_test_nn_array = np.array(X_test_nn)
+X_test_nn_array = np.array(X_test_scaled)
 explainer_nn = shap.Explainer(nn_model.predict_proba, X_test_nn_array)
 shap_values_nn = explainer_nn(X_test_nn_array)
 
@@ -445,17 +433,17 @@ fig, axes = plt.subplots(2, 2, figsize=(15, 12))
 
 # ========== Logistic Regression SHAP ==========
 plt.sca(axes[0, 0])
-shap.summary_plot(shap_values_logit, X_test_logit, feature_names=X.columns, show=False)
+shap.summary_plot(shap_values_logit, X_test_scaled, feature_names=X.columns, show=False)
 axes[0, 0].set_title("Logistic Regression SHAP Summary")
 
 # ========== KNN SHAP ==========
 plt.sca(axes[0, 1])
-shap.summary_plot(shap_values_knn, X_test_knn, feature_names=X.columns, show=False)
+shap.summary_plot(shap_values_knn, X_test_scaled, feature_names=X.columns, show=False)
 axes[0, 1].set_title("KNN SHAP Summary")
 
 # ========== XGBoost SHAP ==========
 plt.sca(axes[1, 0])
-shap.summary_plot(shap_values_xgb, X_test_xgb, feature_names=X.columns, show=False)
+shap.summary_plot(shap_values_xgb, X_test_scaled, feature_names=X.columns, show=False)
 axes[1, 0].set_title("XGBoost SHAP Summary")
 
 # ========== Neural Network SHAP ==========
@@ -474,9 +462,8 @@ plt.show()
 candy_palette = ["#AFD3E7", "#FCA3A3", "#ED5F5F", "#FFA74F", "#D0BBDB", "#9A72C7"]
 
 # Compute SHAP
-X_test_xgb, y_test_xgb = test_data['XGBoost']
-explainer_xgb = shap.Explainer(xgb_model, X_test_xgb)
-shap_values_xgb = explainer_xgb(X_test_xgb)
+explainer_xgb = shap.Explainer(xgb_model, X_test)
+shap_values_xgb = explainer_xgb(X_test)
 
 # Get feature importance (take the average absolute value of the SHAP values)
 shap_importance = np.abs(shap_values_xgb.values).mean(axis=0)
@@ -498,12 +485,11 @@ plt.show()
 # 9. SHAP Decision Plot
 # ========================
 # Re-create X_test_df
-X_test_xgb, y_test_xgb = test_data['XGBoost']
-X_test_df = pd.DataFrame(X_test_xgb, columns=X.columns)
+X_test_df = pd.DataFrame(X_test, columns=X.columns)
 
 # Compute SHAP
-explainer = shap.Explainer(xgb_model, X_test_xgb)
-shap_values = explainer(X_test_xgb)
+explainer = shap.Explainer(xgb_model, X_test)
+shap_values = explainer(X_test)
 
 plt.figure(figsize=(10, 6))
 shap.decision_plot(explainer.expected_value, shap_values.values[:10], X_test_df.iloc[:10])
@@ -640,10 +626,10 @@ train_color = "#AFD3E7"
 test_color = "#ED5F5F"
 
 train_data = {
-    'Logistic': (X_train_scaled, y_train),  # Raw scaling data
-    'KNN': (X_train_scaled, y_train),  # Scaled data
-    'XGBoost': (X_train, y_train),  # Raw data (not scaled)
-    'NeuralNet': (X_train_scaled, y_train)  # Scaled data
+    'Logistic': (X_train_scaled, y_train),
+    'KNN': (X_train_scaled, y_train),
+    'XGBoost': (X_train, y_train),
+    'NeuralNet': (X_train_scaled, y_train)
 }
 
 models = {
@@ -660,6 +646,9 @@ axes = axes.ravel()
 for i, (model_name, model) in enumerate(models.items()):
     # Get the corresponding training data
     X_train_curr, y_train_curr = train_data[model_name]
+
+    # Set the n_jobs parameter to avoid warnings (required for XGBoost)
+    estimator = model if model_name != 'XGBoost' else XGBClassifier(n_jobs=1)
 
     # Calculating the learning curve
     train_sizes, train_scores, test_scores = learning_curve(
@@ -695,3 +684,35 @@ for i, (model_name, model) in enumerate(models.items()):
 
 plt.tight_layout()
 plt.show()
+
+# ========================
+# 14. Age distribution and user churn
+# ========================
+np.random.seed(42)
+data = {
+    'Age': np.random.normal(40, 10, 4000).astype(int),
+    'Left': np.random.choice([0, 1], size=4000, p=[0.75, 0.25])  # 0: Retained, 1: Churned
+}
+df = pd.DataFrame(data)
+
+sns.set(style="whitegrid")
+
+# Plot
+fig, axes = plt.subplots(2, 1, figsize=(10, 8), gridspec_kw={'height_ratios': [3, 1]})
+
+# Histogram (age distribution)
+sns.histplot(df[df["Left"] == 0]["Age"], bins=30, color="deepskyblue", kde=False, alpha=0.7, label="Retained", ax=axes[0])
+sns.histplot(df[df["Left"] == 1]["Age"], bins=30, color="salmon", kde=False, alpha=0.7, label="Churned", ax=axes[0])
+axes[0].set_ylabel("Count")
+axes[0].legend()
+
+# Box plot (age distribution)
+sns.boxplot(x="Age", y="Left", data=df.replace({"Left": {0: "Retained", 1: "Churned"}}), ax=axes[1], palette={"Retained": "deepskyblue", "Churned": "salmon"})
+
+# Restructuring of the layout
+axes[1].set_yticklabels(["Retained", "Churned"])
+axes[1].set_xlabel("Age")
+plt.tight_layout()
+
+plt.show()
+
