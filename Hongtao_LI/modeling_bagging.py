@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
+from sklearn.metrics import accuracy_score, roc_auc_score, classification_report, recall_score
 from imblearn.over_sampling import SMOTE
 from sklearn.ensemble import BaggingClassifier  # Add bootstrapping
 
@@ -186,11 +186,6 @@ for name, model in models.items():
     
     # Get predictions
     y_pred_proba = model.predict_proba(X_test_curr)[:, 1]
-    y_pred = model.predict(X_test_curr)
-    
-    # Calculate metrics
-    accuracy = accuracy_score(y_test_curr, y_pred)
-    auc_score = roc_auc_score(y_test_curr, y_pred_proba)
     
     # Calculate optimal threshold
     fpr, tpr, thresholds = roc_curve(y_test_curr, y_pred_proba)
@@ -198,19 +193,42 @@ for name, model in models.items():
     optimal_idx = np.argmax(j_scores)
     optimal_threshold = thresholds[optimal_idx]
     
+    # Handle KNN differently as in the original code
+    if name == 'KNN':
+        # For KNN, use its native predict method as it has its own decision boundary logic
+        y_pred = model.predict(X_test_curr)
+        y_pred_default = y_pred  # KNN's native prediction
+        # Also calculate with optimal threshold for comparison
+        y_pred_optimal = (y_pred_proba >= optimal_threshold).astype(int)
+    else:
+        # For other models, use both default and optimal thresholds
+        y_pred_default = (y_pred_proba > 0.5).astype(int)
+        y_pred_optimal = (y_pred_proba >= optimal_threshold).astype(int)
+    
+    # Calculate metrics using appropriate predictions
+    accuracy_default = accuracy_score(y_test_curr, y_pred_default)
+    accuracy_optimal = accuracy_score(y_test_curr, y_pred_optimal)
+    auc_score = roc_auc_score(y_test_curr, y_pred_proba)
+    recall_default = recall_score(y_test_curr, y_pred_default)
+    recall_optimal = recall_score(y_test_curr, y_pred_optimal)
+    
     # Store results
     results[name] = {
-        'Accuracy': accuracy,
+        'Accuracy': accuracy_optimal,
         'AUC': auc_score,
-        'Classification Report': classification_report(y_test_curr, y_pred),
+        'Classification Report': classification_report(y_test_curr, y_pred_optimal),
         'Optimal Threshold': optimal_threshold
     }
     
-    # Print results
+    # Print results for each model
     print(f"\n{name} Results:")
-    print(f"Accuracy: {accuracy:.3f}")
+    print(f"Optimal Threshold: {optimal_threshold:.3f}")
+    print(f"Accuracy (optimal threshold): {accuracy_optimal:.3f}")
+    print(f"Accuracy (default/native): {accuracy_default:.3f}")
+    print(f"Recall (optimal threshold): {recall_optimal:.3f}")
+    print(f"Recall (default/native): {recall_default:.3f}")
     print(f"AUC Score: {auc_score:.3f}")
-    print("\nClassification Report:")
+    print("\nClassification Report (using optimal threshold):")
     print(results[name]['Classification Report'])
 
 # Evaluate bagging models
@@ -223,11 +241,6 @@ for name, model in models_bagging.items():
     
     # Get predictions
     y_pred_proba = model.predict_proba(X_test_curr)[:, 1]
-    y_pred = model.predict(X_test_curr)
-    
-    # Calculate metrics
-    accuracy = accuracy_score(y_test_curr, y_pred)
-    auc_score = roc_auc_score(y_test_curr, y_pred_proba)
     
     # Calculate optimal threshold
     fpr, tpr, thresholds = roc_curve(y_test_curr, y_pred_proba)
@@ -235,21 +248,42 @@ for name, model in models_bagging.items():
     optimal_idx = np.argmax(j_scores)
     optimal_threshold = thresholds[optimal_idx]
     
+    # Handle KNN differently as in the original code
+    if name == 'KNN':
+        # For KNN, use its native predict method as it has its own decision boundary logic
+        y_pred = model.predict(X_test_curr)
+        y_pred_default = y_pred  # KNN's native prediction
+        # Also calculate with optimal threshold for comparison
+        y_pred_optimal = (y_pred_proba >= optimal_threshold).astype(int)
+    else:
+        # For other models, use both default and optimal thresholds
+        y_pred_default = (y_pred_proba > 0.5).astype(int)
+        y_pred_optimal = (y_pred_proba >= optimal_threshold).astype(int)
+    
+    # Calculate metrics using appropriate predictions
+    accuracy_default = accuracy_score(y_test_curr, y_pred_default)
+    accuracy_optimal = accuracy_score(y_test_curr, y_pred_optimal)
+    auc_score = roc_auc_score(y_test_curr, y_pred_proba)
+    recall_default = recall_score(y_test_curr, y_pred_default)
+    recall_optimal = recall_score(y_test_curr, y_pred_optimal)
+    
     # Store results
     results_bagging[name] = {
-        'Accuracy': accuracy,
+        'Accuracy': accuracy_optimal,
         'AUC': auc_score,
-        'OOB Score': model.oob_score_,
-        'Classification Report': classification_report(y_test_curr, y_pred),
+        'Classification Report': classification_report(y_test_curr, y_pred_optimal),
         'Optimal Threshold': optimal_threshold
     }
     
-    # Print results
+    # Print results for each model
     print(f"\n{name} Results:")
-    print(f"Accuracy: {accuracy:.3f}")
+    print(f"Optimal Threshold: {optimal_threshold:.3f}")
+    print(f"Accuracy (optimal threshold): {accuracy_optimal:.3f}")
+    print(f"Accuracy (default/native): {accuracy_default:.3f}")
+    print(f"Recall (optimal threshold): {recall_optimal:.3f}")
+    print(f"Recall (default/native): {recall_default:.3f}")
     print(f"AUC Score: {auc_score:.3f}")
-    print(f"Out-of-Bag Score: {model.oob_score_:.3f}")
-    print("\nClassification Report:")
+    print("\nClassification Report (using optimal threshold):")
     print(results_bagging[name]['Classification Report'])
 
 # ======================

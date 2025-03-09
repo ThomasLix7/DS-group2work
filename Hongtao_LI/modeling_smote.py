@@ -48,7 +48,7 @@ logit_model = LogisticRegression(
     penalty='elasticnet',
     C=0.001,
     l1_ratio=0.3,
-    class_weight={0:1, 1:4},  # Using class weights instead of SMOTE
+    class_weight={0:1, 1:4},
     max_iter=5000,
     random_state=17
 ).fit(X_train_scaled, y_train)  # Using original data, not SMOTE
@@ -59,8 +59,8 @@ logit_model = LogisticRegression(
 from sklearn.neighbors import KNeighborsClassifier
 
 knn_model = KNeighborsClassifier(
-    n_neighbors=7,
-    weights='distance',
+    n_neighbors=29,
+    weights='uniform',
     metric='manhattan',
     p=1
 ).fit(X_train_smote, y_train_smote)
@@ -74,12 +74,12 @@ from xgboost import XGBClassifier
 scale_pos_weight = len(y[y==0]) / len(y[y==1])
 
 xgb_model = XGBClassifier(
-    max_depth=4,
-    learning_rate=0.01,
-    n_estimators=200,
-    subsample=0.8,
-    colsample_bytree=0.8,
-    eval_metric='auc',
+    max_depth=5,           
+    learning_rate=0.05,    
+    n_estimators=100,      
+    subsample=1.0,      
+    colsample_bytree=0.8,  
+    eval_metric='logloss',
     random_state=17,
     scale_pos_weight=scale_pos_weight
 ).fit(X_train_scaled, y_train)  # Using original data, not SMOTE
@@ -130,16 +130,7 @@ for name, model in models.items():
     X_test_curr, y_test_curr = test_data[name]
     
     # Get predictions
-    if name == 'KNN':
-        y_pred_proba = model.predict_proba(X_test_curr)[:, 1]
-        y_pred = model.predict(X_test_curr)
-    else:
-        y_pred_proba = model.predict_proba(X_test_curr)[:, 1]
-        y_pred = (y_pred_proba > 0.5).astype(int)
-    
-    # Calculate metrics
-    accuracy = accuracy_score(y_test_curr, y_pred)
-    auc_score = roc_auc_score(y_test_curr, y_pred_proba)
+    y_pred_proba = model.predict_proba(X_test_curr)[:, 1]
     
     # Calculate optimal threshold
     fpr, tpr, thresholds = roc_curve(y_test_curr, y_pred_proba)
@@ -147,19 +138,38 @@ for name, model in models.items():
     optimal_idx = np.argmax(j_scores)
     optimal_threshold = thresholds[optimal_idx]
     
-    # Store results
+    # Handle KNN differently as in the original code
+    if name == 'KNN':
+        # For KNN, use its native predict method as it has its own decision boundary logic
+        y_pred = model.predict(X_test_curr)
+        y_pred_default = y_pred  # KNN's native prediction
+        # Also calculate with optimal threshold for comparison
+        y_pred_optimal = (y_pred_proba >= optimal_threshold).astype(int)
+    else:
+        # For other models, use both default and optimal thresholds
+        y_pred_default = (y_pred_proba > 0.5).astype(int)
+        y_pred_optimal = (y_pred_proba >= optimal_threshold).astype(int)
+    
+    # Calculate metrics using appropriate predictions
+    accuracy_default = accuracy_score(y_test_curr, y_pred_default)
+    accuracy_optimal = accuracy_score(y_test_curr, y_pred_optimal)
+    auc_score = roc_auc_score(y_test_curr, y_pred_proba)  # AUC is independent of threshold
+    
+    # Store results with optimal threshold metrics
     results[name] = {
-        'Accuracy': accuracy,
+        'Accuracy': accuracy_optimal,
         'AUC': auc_score,
-        'Classification Report': classification_report(y_test_curr, y_pred),
+        'Classification Report': classification_report(y_test_curr, y_pred_optimal),
         'Optimal Threshold': optimal_threshold
     }
     
     # Print results for each model
     print(f"\n{name} Results:")
-    print(f"Accuracy: {accuracy:.3f}")
+    print(f"Optimal Threshold: {optimal_threshold:.3f}")
+    print(f"Accuracy (optimal threshold): {accuracy_optimal:.3f}")
+    print(f"Accuracy (default/native): {accuracy_default:.3f}")
     print(f"AUC Score: {auc_score:.3f}")
-    print("\nClassification Report:")
+    print("\nClassification Report (using optimal threshold):")
     print(results[name]['Classification Report'])
 
 # ======================

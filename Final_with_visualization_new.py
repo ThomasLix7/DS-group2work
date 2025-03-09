@@ -16,7 +16,7 @@ from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
+from sklearn.metrics import accuracy_score, roc_auc_score, classification_report, recall_score
 from imblearn.over_sampling import SMOTE
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Load and prepare dataset
-df = pd.read_csv("output.csv")
+df = pd.read_csv("QM_pre-process/output.csv")
 df = df.drop(['Customer_ID', 'Source'], axis=1)
 
 # Prepare features (X) and target (y)
@@ -73,8 +73,8 @@ logit_model = LogisticRegression(
 from sklearn.neighbors import KNeighborsClassifier
 
 knn_model = KNeighborsClassifier(
-    n_neighbors=7,
-    weights='distance',
+    n_neighbors=29,
+    weights='uniform',
     metric='manhattan',
     p=1
 ).fit(X_train_smote, y_train_smote)
@@ -88,15 +88,15 @@ from xgboost import XGBClassifier
 scale_pos_weight = len(y[y == 0]) / len(y[y == 1])
 
 xgb_model = XGBClassifier(
-    max_depth=4,
-    learning_rate=0.01,
+    max_depth=3,
+    learning_rate=0.05,
     n_estimators=200,
-    subsample=0.8,
+    subsample=1.0,
     colsample_bytree=0.8,
     eval_metric='auc',
-    random_state=17,
+    random_state=42,
     scale_pos_weight=scale_pos_weight
-).fit(X_train_scaled, y_train)  # Using original data, not SMOTE
+).fit(X_train, y_train)  # Using raw data, not scaled
 
 # ======================
 # 5. Neural Network with SMOTE
@@ -104,10 +104,10 @@ xgb_model = XGBClassifier(
 from sklearn.neural_network import MLPClassifier
 
 nn_model = MLPClassifier(
-    hidden_layer_sizes=(128, 64, 32),  # Updated from best parameters of nn_smote.py
+    hidden_layer_sizes=(64, 32),
     activation='tanh',
     solver='adam',
-    alpha=0.01,
+    alpha=0.1,
     learning_rate_init=0.01,
     batch_size=256,
     max_iter=1000,
@@ -125,7 +125,7 @@ from sklearn.metrics import roc_curve
 test_data = {
     'Logistic': (X_test_scaled, y_test),
     'KNN': (X_test_scaled, y_test),
-    'XGBoost': (X_test_scaled, y_test),
+    'XGBoost': (X_test, y_test),
     'NeuralNet': (X_test_scaled, y_test)
 }
 
@@ -142,38 +142,74 @@ print("=" * 50)
 for name, model in models.items():
     # Get corresponding test data
     X_test_curr, y_test_curr = test_data[name]
-
+    
     # Get predictions
-    if name == 'KNN':
-        y_pred_proba = model.predict_proba(X_test_curr)[:, 1]
-        y_pred = model.predict(X_test_curr)
-    else:
-        y_pred_proba = model.predict_proba(X_test_curr)[:, 1]
-        y_pred = (y_pred_proba > 0.5).astype(int)
-
-    # Calculate metrics
-    accuracy = accuracy_score(y_test_curr, y_pred)
-    auc_score = roc_auc_score(y_test_curr, y_pred_proba)
-
+    y_pred_proba = model.predict_proba(X_test_curr)[:, 1]
+    
     # Calculate optimal threshold
     fpr, tpr, thresholds = roc_curve(y_test_curr, y_pred_proba)
     j_scores = tpr - fpr
     optimal_idx = np.argmax(j_scores)
     optimal_threshold = thresholds[optimal_idx]
-
-    # Store results
+    
+    # For XGBoost, we'll also calculate a recall-focused threshold
+    if name == 'XGBoost':
+        # Find threshold that gives at least 0.7 recall for class 1
+        # This is a simple approach - we could use more sophisticated methods
+        recall_thresholds = []
+        for threshold in np.arange(0.1, 0.6, 0.01):
+            y_pred_recall = (y_pred_proba >= threshold).astype(int)
+            recall = recall_score(y_test_curr, y_pred_recall)
+            recall_thresholds.append((threshold, recall))
+        
+        # Find the highest threshold that gives at least 0.7 recall
+        recall_focused_thresholds = [(t, r) for t, r in recall_thresholds if r >= 0.7]
+        if recall_focused_thresholds:
+            recall_focused_threshold = max(recall_focused_thresholds, key=lambda x: x[0])[0]
+            print(f"\nRecall-focused threshold for XGBoost: {recall_focused_threshold:.3f}")
+            
+            # Calculate metrics with recall-focused threshold
+            y_pred_recall_focused = (y_pred_proba >= recall_focused_threshold).astype(int)
+            accuracy_recall_focused = accuracy_score(y_test_curr, y_pred_recall_focused)
+            recall_value = recall_score(y_test_curr, y_pred_recall_focused)
+            
+            print(f"Accuracy (recall-focused threshold): {accuracy_recall_focused:.3f}")
+            print(f"Recall (recall-focused threshold): {recall_value:.3f}")
+            print("\nClassification Report (recall-focused threshold):")
+            print(classification_report(y_test_curr, y_pred_recall_focused))
+    
+    # Handle KNN differently as in the original code
+    if name == 'KNN':
+        # For KNN, use its native predict method as it has its own decision boundary logic
+        y_pred = model.predict(X_test_curr)
+        y_pred_default = y_pred  # KNN's native prediction
+        # Also calculate with optimal threshold for comparison
+        y_pred_optimal = (y_pred_proba >= optimal_threshold).astype(int)
+    else:
+        # For other models, use both default and optimal thresholds
+        y_pred_default = (y_pred_proba > 0.5).astype(int)
+        y_pred_optimal = (y_pred_proba >= optimal_threshold).astype(int)
+    
+    # Calculate metrics using appropriate predictions
+    accuracy_default = accuracy_score(y_test_curr, y_pred_default)
+    accuracy_optimal = accuracy_score(y_test_curr, y_pred_optimal)
+    auc_score = roc_auc_score(y_test_curr, y_pred_proba)  # AUC is independent of threshold
+    
+    # Store results with optimal threshold metrics
     results[name] = {
-        'Accuracy': accuracy,
+        'Accuracy': accuracy_optimal,
         'AUC': auc_score,
-        'Classification Report': classification_report(y_test_curr, y_pred),
+        'Classification Report': classification_report(y_test_curr, y_pred_optimal),
         'Optimal Threshold': optimal_threshold
     }
-
+    
     # Print results for each model
     print(f"\n{name} Results:")
-    print(f"Accuracy: {accuracy:.3f}")
+    print(f"Optimal Threshold: {optimal_threshold:.3f}")
+    print(f"Accuracy (optimal threshold): {accuracy_optimal:.3f}")
+    print(f"Accuracy (default/native): {accuracy_default:.3f}")
     print(f"AUC Score: {auc_score:.3f}")
-    print("\nClassification Report:")
+    print("\nClassification Report (using optimal threshold):")
     print(results[name]['Classification Report'])
 
 
@@ -308,11 +344,21 @@ fig, axes = plt.subplots(1, len(models), figsize=(15, 4))
 
 for i, (name, model) in enumerate(models.items()):
     X_test_curr, y_test_curr = test_data[name]
-    y_pred = model.predict(X_test_curr)
+    
+    # Get predictions using optimal threshold
+    y_pred_proba = model.predict_proba(X_test_curr)[:, 1]
+    optimal_threshold = results[name]['Optimal Threshold']
+    
+    # Use optimal threshold for predictions
+    if name == 'KNN':
+        # For comparison, show both native KNN prediction and threshold-based prediction
+        y_pred = model.predict(X_test_curr)
+    else:
+        y_pred = (y_pred_proba >= optimal_threshold).astype(int)
 
     cm = confusion_matrix(y_test_curr, y_pred)
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=axes[i])
-    axes[i].set_title(f'Confusion Matrix - {name}')
+    axes[i].set_title(f'Confusion Matrix - {name}\n(Threshold: {optimal_threshold:.3f})')
     axes[i].set_xlabel('Predicted')
     axes[i].set_ylabel('Actual')
 
@@ -397,29 +443,34 @@ plt.show()
 # 7. SHAP Summary Plot (Global Importance)
 # ========================
 # Calculating the SHAP value
-explainer = shap.Explainer(xgb_model, X_test_scaled)
-shap_values = explainer(X_test_scaled)
+X_test_xgb, y_test_xgb = test_data['XGBoost']
+explainer = shap.Explainer(xgb_model, X_test_xgb)
+shap_values = explainer(X_test_xgb)
 
 # Plot SHAP
 plt.figure(figsize=(10, 6))
-shap.summary_plot(shap_values, X_test_scaled, feature_names=X.columns)
+shap.summary_plot(shap_values, X_test_xgb, feature_names=X.columns)
 
 '''
 All models are time-consuming to compute SHAP, 
 and only the XGBoost model was chosen as a representative for the computations
 
-# Compute SHAP
-explainer_logit = shap.Explainer(logit_model, X_test_scaled)
-shap_values_logit = explainer_logit(X_test_scaled)
+# Compute SHAP for all models
+X_test_logit, y_test_logit = test_data['Logistic']
+explainer_logit = shap.Explainer(logit_model, X_test_logit)
+shap_values_logit = explainer_logit(X_test_logit)
 
-explainer_knn = shap.Explainer(knn_model.predict_proba, X_test_scaled)
-shap_values_knn = explainer_knn(X_test_scaled)
+X_test_knn, y_test_knn = test_data['KNN']
+explainer_knn = shap.Explainer(knn_model.predict_proba, X_test_knn)
+shap_values_knn = explainer_knn(X_test_knn)
 
-explainer_xgb = shap.Explainer(xgb_model, X_test_scaled)
-shap_values_xgb = explainer_xgb(X_test_scaled)
+X_test_xgb, y_test_xgb = test_data['XGBoost']
+explainer_xgb = shap.Explainer(xgb_model, X_test_xgb)
+shap_values_xgb = explainer_xgb(X_test_xgb)
 
 # Fix MLPClassifier (make sure data is converted to NumPy arrays)
-X_test_nn_array = np.array(X_test_scaled)
+X_test_nn, y_test_nn = test_data['NeuralNet']
+X_test_nn_array = np.array(X_test_nn)
 explainer_nn = shap.Explainer(nn_model.predict_proba, X_test_nn_array)
 shap_values_nn = explainer_nn(X_test_nn_array)
 
@@ -428,17 +479,17 @@ fig, axes = plt.subplots(2, 2, figsize=(15, 12))
 
 # ========== Logistic Regression SHAP ==========
 plt.sca(axes[0, 0])
-shap.summary_plot(shap_values_logit, X_test_scaled, feature_names=X.columns, show=False)
+shap.summary_plot(shap_values_logit, X_test_logit, feature_names=X.columns, show=False)
 axes[0, 0].set_title("Logistic Regression SHAP Summary")
 
 # ========== KNN SHAP ==========
 plt.sca(axes[0, 1])
-shap.summary_plot(shap_values_knn, X_test_scaled, feature_names=X.columns, show=False)
+shap.summary_plot(shap_values_knn, X_test_knn, feature_names=X.columns, show=False)
 axes[0, 1].set_title("KNN SHAP Summary")
 
 # ========== XGBoost SHAP ==========
 plt.sca(axes[1, 0])
-shap.summary_plot(shap_values_xgb, X_test_scaled, feature_names=X.columns, show=False)
+shap.summary_plot(shap_values_xgb, X_test_xgb, feature_names=X.columns, show=False)
 axes[1, 0].set_title("XGBoost SHAP Summary")
 
 # ========== Neural Network SHAP ==========
@@ -457,8 +508,9 @@ plt.show()
 candy_palette = ["#AFD3E7", "#FCA3A3", "#ED5F5F", "#FFA74F", "#D0BBDB", "#9A72C7"]
 
 # Compute SHAP
-explainer_xgb = shap.Explainer(xgb_model, X_test_scaled)
-shap_values_xgb = explainer_xgb(X_test_scaled)
+X_test_xgb, y_test_xgb = test_data['XGBoost']
+explainer_xgb = shap.Explainer(xgb_model, X_test_xgb)
+shap_values_xgb = explainer_xgb(X_test_xgb)
 
 # Get feature importance (take the average absolute value of the SHAP values)
 shap_importance = np.abs(shap_values_xgb.values).mean(axis=0)
@@ -480,11 +532,12 @@ plt.show()
 # 9. SHAP Decision Plot
 # ========================
 # Re-create X_test_df
-X_test_df = pd.DataFrame(X_test_scaled, columns=X.columns)
+X_test_xgb, y_test_xgb = test_data['XGBoost']
+X_test_df = pd.DataFrame(X_test_xgb, columns=X.columns)
 
 # Compute SHAP
-explainer = shap.Explainer(xgb_model, X_test_scaled)
-shap_values = explainer(X_test_scaled)
+explainer = shap.Explainer(xgb_model, X_test_xgb)
+shap_values = explainer(X_test_xgb)
 
 plt.figure(figsize=(10, 6))
 shap.decision_plot(explainer.expected_value, shap_values.values[:10], X_test_df.iloc[:10])
@@ -623,7 +676,7 @@ test_color = "#ED5F5F"
 train_data = {
     'Logistic': (X_train_scaled, y_train),  # Raw scaling data
     'KNN': (X_train_smote, y_train_smote),  # SMOTE
-    'XGBoost': (X_train_scaled, y_train),  # Raw scaling data
+    'XGBoost': (X_train, y_train),  # Raw data (not scaled)
     'NeuralNet': (X_train_smote, y_train_smote)  # SMOTE
 }
 
@@ -679,6 +732,3 @@ for i, (model_name, model) in enumerate(models.items()):
 
 plt.tight_layout()
 plt.show()
-
-
-

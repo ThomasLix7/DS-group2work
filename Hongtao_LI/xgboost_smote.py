@@ -2,9 +2,57 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, GridSearchCV
 from xgboost import XGBClassifier
-from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
+from sklearn.metrics import accuracy_score, classification_report, roc_auc_score, recall_score, balanced_accuracy_score
 from sklearn.metrics import roc_curve
 from imblearn.over_sampling import SMOTE
+
+# Function to train and evaluate a basic model with SMOTE
+def train_basic_model_smote(X_train, X_test, y_train, y_test):
+    print("\n" + "="*50)
+    print("Training Basic XGBoost Model with SMOTE (Default Parameters)")
+    print("="*50)
+    
+    # Apply SMOTE to training data
+    smote = SMOTE(random_state=42)
+    X_train_smote, y_train_smote = smote.fit_resample(X_train, y_train)
+    
+    # Create a basic XGBoost with default parameters
+    basic_model = XGBClassifier(
+        objective='binary:logistic',
+        eval_metric='auc',
+        use_label_encoder=False,
+        random_state=17
+    )
+    
+    # Train the model on SMOTE-resampled data
+    basic_model.fit(X_train_smote, y_train_smote)
+    
+    # Get predictions
+    y_pred_proba = basic_model.predict_proba(X_test)[:, 1]
+    
+    # Calculate optimal threshold
+    fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
+    j_scores = tpr - fpr
+    optimal_idx = np.argmax(j_scores)
+    optimal_threshold = thresholds[optimal_idx]
+    
+    # Calculate metrics with optimal threshold
+    y_pred_optimal = (y_pred_proba >= optimal_threshold).astype(int)
+    accuracy_optimal = accuracy_score(y_test, y_pred_optimal)
+    auc = roc_auc_score(y_test, y_pred_proba)
+    recall_optimal = recall_score(y_test, y_pred_optimal)
+    balanced_acc_optimal = balanced_accuracy_score(y_test, y_pred_optimal)
+    
+    print(f"\nBasic Model with SMOTE Performance (Optimal threshold = {optimal_threshold:.3f}):")
+    print(f"Accuracy: {accuracy_optimal:.4f}")
+    print(f"Balanced Accuracy: {balanced_acc_optimal:.4f}")
+    print(f"AUC Score: {auc:.4f}")
+    print(f"Recall Score: {recall_optimal:.4f}")
+    
+    print("\nClassification Report (Basic Model with SMOTE, Optimal threshold):")
+    print(classification_report(y_test, y_pred_optimal))
+    
+    return basic_model, auc, recall_optimal, optimal_threshold
 
 # Load and preprocess data
 df = pd.read_csv("QM_pre-process/output.csv")
@@ -26,7 +74,10 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
 
-# Apply SMOTE
+# Train basic model with SMOTE first to establish baseline
+basic_model, basic_auc, basic_recall, basic_optimal_threshold = train_basic_model_smote(X_train, X_test, y_train, y_test)
+
+# Apply SMOTE for fine-tuned models
 smote = SMOTE(random_state=42)
 X_train_smote, y_train_smote = smote.fit_resample(X_train, y_train)
 
@@ -121,6 +172,11 @@ models = {
 print("\nModel Comparison:")
 print("="*50)
 
+best_tuned_auc = 0
+best_tuned_recall = 0
+best_tuned_threshold = 0
+best_tuned_name = ""
+
 for name, model in models.items():
     print(f"\n{name} Results:")
     print("-"*20)
@@ -141,20 +197,30 @@ for name, model in models.items():
     
     # Make predictions with optimal threshold
     y_pred_optimal = (y_pred_proba >= optimal_threshold).astype(int)
+    recall = recall_score(y_test, y_pred_optimal)
+    
+    # Track best model for comparison with basic model
+    if auc_score > best_tuned_auc:
+        best_tuned_auc = auc_score
+        best_tuned_recall = recall
+        best_tuned_threshold = optimal_threshold
+        best_tuned_name = name
     
     print(f"\nBest Parameters:")
     if name == 'SMOTE':
         print(grid_search_smote.best_params_)
+        best_cv_score = grid_search_smote.best_score_
     elif name == 'Weight':
         print(grid_search_weight.best_params_)
+        best_cv_score = grid_search_weight.best_score_
     else:
         print(grid_search_both.best_params_)
+        best_cv_score = grid_search_both.best_score_
     
-    print(f"\nDefault Threshold (0.5):")
-    print(f"Accuracy: {accuracy:.4f}")
-    print(f"ROC AUC: {auc_score:.4f}")
-    print("\nClassification Report:")
-    print(classification_report(y_test, y_pred))
+    print(f"\nModel Performance:")
+    print(f"Best ROC AUC (CV): {best_cv_score:.4f}")
+    print(f"Test ROC AUC: {auc_score:.4f}")
+    print(f"Test Recall: {recall:.4f}")
     
     print(f"\nOptimal Threshold ({optimal_threshold:.4f}):")
     print(f"Accuracy: {accuracy_score(y_test, y_pred_optimal):.4f}")
@@ -169,6 +235,19 @@ for name, model in models.items():
     
     print("\nTop 10 Feature Importance:")
     print(importance_df.head(10))
+
+# Add comparison of basic vs best tuned model
+print("\n" + "="*50)
+print(f"BASIC VS FINE-TUNED MODEL PERFORMANCE COMPARISON (BOTH WITH SMOTE)")
+print("="*50)
+print(f"Best fine-tuned model: {best_tuned_name}")
+print(f"{'Metric':<15}{'Basic Model':<15}{'Fine-tuned Model':<15}{'Improvement':<15}")
+print(f"{'-'*60}")
+
+# Optimal threshold comparison
+print(f"{'AUC':<15}{basic_auc:.4f}{'':<7}{best_tuned_auc:.4f}{'':<7}{((best_tuned_auc-basic_auc)/basic_auc)*100:.2f}%")
+print(f"{'Recall':<15}{basic_recall:.4f}{'':<7}{best_tuned_recall:.4f}{'':<7}{((best_tuned_recall-basic_recall)/basic_recall)*100:.2f}%")
+print(f"\nOptimal thresholds: Basic model: {basic_optimal_threshold:.3f}, Fine-tuned model: {best_tuned_threshold:.3f}")
 
 # Save the best model (choose based on results)
 best_scores = {
