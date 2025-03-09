@@ -50,7 +50,7 @@ X = df.drop('Left', axis=1)
 y = df['Left']
 
 # Split the data
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=17)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # Train basic model first to establish baseline
 basic_model, basic_auc, basic_recall, basic_optimal_threshold = train_basic_model(X_train, X_test, y_train, y_test)

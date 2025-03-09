@@ -58,11 +58,11 @@ results = {}
 from sklearn.neighbors import KNeighborsClassifier
 
 knn_model = KNeighborsClassifier(
-        n_neighbors=29,           # Updated from knn.py best parameters
-        weights='uniform',       # Updated from knn.py best parameters
-        metric='manhattan',      # Updated from knn.py best parameters
-        p=1                      # Updated from knn.py best parameters
-    ).fit(X_train_scaled, y_train)
+    n_neighbors=33,           # Updated from knn_updated.py best parameters
+    weights='distance',       # Updated from knn_updated.py best parameters
+    metric='manhattan',      
+    p=1                      
+).fit(X_train_scaled, y_train)
 
 # ======================
 # 4. XGBoost Implementation (from xgBoost.py)

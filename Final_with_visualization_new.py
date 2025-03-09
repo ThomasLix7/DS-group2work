@@ -69,8 +69,8 @@ logit_model = LogisticRegression(
 from sklearn.neighbors import KNeighborsClassifier
 
 knn_model = KNeighborsClassifier(
-    n_neighbors=29,
-    weights='uniform',
+    n_neighbors=33,
+    weights='distance',
     metric='manhattan',
     p=1
 ).fit(X_train_scaled, y_train)  # Using scaled data, not SMOTE
@@ -147,32 +147,6 @@ for name, model in models.items():
     j_scores = tpr - fpr
     optimal_idx = np.argmax(j_scores)
     optimal_threshold = thresholds[optimal_idx]
-    
-    # For XGBoost, we'll also calculate a recall-focused threshold
-    if name == 'XGBoost':
-        # Find threshold that gives at least 0.7 recall for class 1
-        # This is a simple approach - we could use more sophisticated methods
-        recall_thresholds = []
-        for threshold in np.arange(0.1, 0.6, 0.01):
-            y_pred_recall = (y_pred_proba >= threshold).astype(int)
-            recall = recall_score(y_test_curr, y_pred_recall)
-            recall_thresholds.append((threshold, recall))
-        
-        # Find the highest threshold that gives at least 0.7 recall
-        recall_focused_thresholds = [(t, r) for t, r in recall_thresholds if r >= 0.7]
-        if recall_focused_thresholds:
-            recall_focused_threshold = max(recall_focused_thresholds, key=lambda x: x[0])[0]
-            print(f"\nRecall-focused threshold for XGBoost: {recall_focused_threshold:.3f}")
-            
-            # Calculate metrics with recall-focused threshold
-            y_pred_recall_focused = (y_pred_proba >= recall_focused_threshold).astype(int)
-            accuracy_recall_focused = accuracy_score(y_test_curr, y_pred_recall_focused)
-            recall_value = recall_score(y_test_curr, y_pred_recall_focused)
-            
-            print(f"Accuracy (recall-focused threshold): {accuracy_recall_focused:.3f}")
-            print(f"Recall (recall-focused threshold): {recall_value:.3f}")
-            print("\nClassification Report (recall-focused threshold):")
-            print(classification_report(y_test_curr, y_pred_recall_focused))
     
     # Handle KNN differently as in the original code
     if name == 'KNN':
@@ -346,11 +320,7 @@ for i, (name, model) in enumerate(models.items()):
     optimal_threshold = results[name]['Optimal Threshold']
     
     # Use optimal threshold for predictions
-    if name == 'KNN':
-        # For comparison, show both native KNN prediction and threshold-based prediction
-        y_pred = model.predict(X_test_curr)
-    else:
-        y_pred = (y_pred_proba >= optimal_threshold).astype(int)
+    y_pred = (y_pred_proba >= optimal_threshold).astype(int)
 
     cm = confusion_matrix(y_test_curr, y_pred)
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=axes[i])
