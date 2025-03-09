@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+from imblearn.over_sampling import SMOTE
 
 # Load and prepare dataset
 df = pd.read_csv("QM_pre-process/output.csv")
@@ -26,6 +27,10 @@ X_train, X_test, y_train, y_test = train_test_split(
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
+
+# Apply SMOTE if it exists
+smote = SMOTE(random_state=17)
+X_train_smote, y_train_smote = smote.fit_resample(X_train_scaled, y_train)
 
 # ======================
 # 2. Logistic Regression (from logistic.py)
@@ -68,12 +73,12 @@ from xgboost import XGBClassifier
 scale_pos_weight = len(y[y==0]) / len(y[y==1])
 
 xgb_model = XGBClassifier(
-    max_depth=5,           # From xgBoost.py best parameters
-    learning_rate=0.05,    
+    max_depth=3,           # From xgBoost.py best parameters
+    learning_rate=0.1,    
     n_estimators=100,      
-    subsample=1.0,      
+    subsample=0.8,      
     colsample_bytree=0.8,  
-    eval_metric='logloss',
+    eval_metric='auc',
     random_state=17,
     scale_pos_weight=scale_pos_weight
 ).fit(X_train, y_train)

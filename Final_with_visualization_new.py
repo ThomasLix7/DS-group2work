@@ -45,10 +45,6 @@ scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
-# Apply SMOTE for models that need it
-smote = SMOTE(random_state=17)
-X_train_smote, y_train_smote = smote.fit_resample(X_train_scaled, y_train)
-
 # Initialize dictionaries to store models and results
 models = {}
 results = {}
@@ -68,7 +64,7 @@ logit_model = LogisticRegression(
 ).fit(X_train_scaled, y_train)  # Using original data, not SMOTE
 
 # ======================
-# 3. KNN with SMOTE
+# 3. KNN Implementation
 # ======================
 from sklearn.neighbors import KNeighborsClassifier
 
@@ -77,7 +73,7 @@ knn_model = KNeighborsClassifier(
     weights='uniform',
     metric='manhattan',
     p=1
-).fit(X_train_smote, y_train_smote)
+).fit(X_train_scaled, y_train)  # Using scaled data, not SMOTE
 
 # ======================
 # 4. XGBoost (no SMOTE, using scale_pos_weight)
@@ -89,17 +85,17 @@ scale_pos_weight = len(y[y == 0]) / len(y[y == 1])
 
 xgb_model = XGBClassifier(
     max_depth=3,
-    learning_rate=0.05,
-    n_estimators=200,
-    subsample=1.0,
+    learning_rate=0.1,
+    n_estimators=100,
+    subsample=0.8,
     colsample_bytree=0.8,
     eval_metric='auc',
-    random_state=42,
+    random_state=17,
     scale_pos_weight=scale_pos_weight
 ).fit(X_train, y_train)  # Using raw data, not scaled
 
 # ======================
-# 5. Neural Network with SMOTE
+# 5. Neural Network
 # ======================
 from sklearn.neural_network import MLPClassifier
 
@@ -114,7 +110,7 @@ nn_model = MLPClassifier(
     early_stopping=True,
     validation_fraction=0.2,
     random_state=17
-).fit(X_train_smote, y_train_smote)
+).fit(X_train_scaled, y_train)  # Using scaled data, not SMOTE
 
 # ======================
 # 6. Model Evaluation
@@ -675,9 +671,9 @@ test_color = "#ED5F5F"
 
 train_data = {
     'Logistic': (X_train_scaled, y_train),  # Raw scaling data
-    'KNN': (X_train_smote, y_train_smote),  # SMOTE
+    'KNN': (X_train_scaled, y_train),  # Scaled data
     'XGBoost': (X_train, y_train),  # Raw data (not scaled)
-    'NeuralNet': (X_train_smote, y_train_smote)  # SMOTE
+    'NeuralNet': (X_train_scaled, y_train)  # Scaled data
 }
 
 models = {
@@ -694,9 +690,6 @@ axes = axes.ravel()
 for i, (model_name, model) in enumerate(models.items()):
     # Get the corresponding training data
     X_train_curr, y_train_curr = train_data[model_name]
-
-    # Set the n_jobs parameter to avoid warnings (required for XGBoost)
-    estimator = model if model_name != 'XGBoost' else XGBClassifier(n_jobs=1)
 
     # Calculating the learning curve
     train_sizes, train_scores, test_scores = learning_curve(
