@@ -10,7 +10,7 @@ Group work for Fundamental of data science
 
 6.Score列大于850的数量有4个，删掉  
 
-7. 增加每一列的分布图用来识别异常值
+7. 增加每一列的分布图用来识别异常值  
 Create a new environment or whatever you want, install the packages in the requirements.txt file by the command:
 ```
 pip install -r requirements.txt
