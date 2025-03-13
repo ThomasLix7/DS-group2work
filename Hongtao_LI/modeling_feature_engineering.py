@@ -10,7 +10,6 @@ from sklearn.metrics import (
 )
 from imblearn.over_sampling import SMOTE
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from xgboost import XGBClassifier
 from sklearn.neural_network import MLPClassifier
@@ -58,17 +57,6 @@ def train_models(X_train, X_test, y_train, y_test):
     smote = SMOTE(random_state=17)
     X_train_smote, y_train_smote = smote.fit_resample(X_train_scaled, y_train)
     
-    # Logistic Regression (with class weights, no SMOTE)
-    logit_model = LogisticRegression(
-        solver='saga',
-        penalty='elasticnet',
-        C=0.001,
-        l1_ratio=0.3,
-        class_weight={0:1, 1:4},
-        max_iter=5000,
-        random_state=17
-    ).fit(X_train_scaled, y_train)
-    
     # KNN with SMOTE
     knn_model = KNeighborsClassifier(
         n_neighbors=7,
@@ -80,10 +68,10 @@ def train_models(X_train, X_test, y_train, y_test):
     # XGBoost (no SMOTE, using scale_pos_weight)
     scale_pos_weight = len(y_train[y_train==0]) / len(y_train[y_train==1])
     xgb_model = XGBClassifier(
-        max_depth=4,
-        learning_rate=0.01,
+        max_depth=3,
+        learning_rate=0.05,
         n_estimators=200,
-        subsample=0.8,
+        subsample=1.0,
         colsample_bytree=0.8,
         eval_metric='auc',
         random_state=17,
@@ -106,7 +94,6 @@ def train_models(X_train, X_test, y_train, y_test):
     
     # Store models
     models = {
-        'Logistic': logit_model,
         'KNN': knn_model,
         'XGBoost': xgb_model,
         'NeuralNet': nn_model
@@ -200,8 +187,8 @@ def compare_and_visualize(original_results, engineered_results, model_names):
     print(comparison_df.to_string(index=False, float_format=lambda x: f"{x:.4f}"))
     
     # Define the specific colors requested
-    original_color = (225/255, 92/255, 61/255)  # RGB(225, 92, 61) - reddish orange
-    engineered_color = (22/255, 156/255, 154/255)  # RGB(22, 156, 154) - teal
+    original_color = (189/255, 217/255, 247/255)  # Light blue (RGB: 189, 217, 247)
+    engineered_color = (255/255, 202/255, 167/255)  # Light orange/peach (RGB: 255, 202, 167)
     
     # Visualize the comparison
     plt.figure(figsize=(12, 6))  # Adjusted height for single subplot
@@ -219,23 +206,13 @@ def compare_and_visualize(original_results, engineered_results, model_names):
     plt.ylabel('AUC Score')
     plt.title('Impact of Feature Engineering on AUC Performance')
     plt.xticks(x, model_names)
-    plt.legend(loc='center left', bbox_to_anchor=(1.02, 0.5))  # Move legend to the right side
+    
+    # Position the legend inside the plot area instead of outside
+    plt.legend(loc='upper right')
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     
-    # Add percentage increase annotation
-    for i, model in enumerate(model_names):
-        original_auc = comparison_df.loc[i, 'Original AUC']
-        engineered_auc = comparison_df.loc[i, 'Engineered AUC']
-        percent_increase = ((engineered_auc - original_auc) / original_auc) * 100
-        
-        # Add annotation for percentage increase
-        if percent_increase > 0:
-            plt.text(i, max(original_auc, engineered_auc) + 0.01, 
-                    f"+{percent_increase:.1f}%", 
-                    ha='center', fontsize=9, fontweight='bold', color='green')
-    
     plt.tight_layout()
-    plt.subplots_adjust(right=0.85)  # Adjust to make room for the legend
+    plt.savefig('feature_engineering_impact.png', dpi=300, bbox_inches='tight')
     plt.show()
     
     # Add a note about thresholds being used
@@ -260,7 +237,7 @@ def visualize_features(engineered_models, X_eng_columns, original_columns):
     
     # Show top features
     
-    bars = plt.barh(range(len(xgb_importance)), xgb_importance.values, color=(22/255, 156/255, 154/255))
+    bars = plt.barh(range(len(xgb_importance)), xgb_importance.values, color=(189/255, 217/255, 247/255))  # Light blue for original features
     plt.yticks(range(len(xgb_importance)), xgb_importance.index)
     plt.gca().invert_yaxis()  # Highest importance at the top
     plt.title('XGBoost Feature Importance (After Engineering)')
@@ -270,13 +247,13 @@ def visualize_features(engineered_models, X_eng_columns, original_columns):
     # Using a definitive list of original columns to avoid confusion
     for i, feature in enumerate(xgb_importance.index):
         if feature not in original_columns:
-            bars[i].set_color((225/255, 92/255, 61/255))  # Engineered features in orange
+            bars[i].set_color((255/255, 202/255, 167/255))  # Light orange/peach for engineered features
     
     # Add a legend
     from matplotlib.patches import Patch
     legend_elements = [
-        Patch(facecolor=(22/255, 156/255, 154/255), label='Original Features'),
-        Patch(facecolor=(225/255, 92/255, 61/255), label='Engineered Features')
+        Patch(facecolor=(189/255, 217/255, 247/255), label='Original Features'),
+        Patch(facecolor=(255/255, 202/255, 167/255), label='Engineered Features')
     ]
     plt.legend(handles=legend_elements, loc='lower right')
     
@@ -333,4 +310,4 @@ if __name__ == "__main__":
     feature_importance = visualize_features(engineered_models, X_eng.columns, X.columns)
     
     # Compare results
-    comparison = compare_and_visualize(original_results, engineered_results, ['Logistic', 'KNN', 'XGBoost', 'NeuralNet'])
+    comparison = compare_and_visualize(original_results, engineered_results, ['KNN', 'XGBoost', 'NeuralNet'])

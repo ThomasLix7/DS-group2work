@@ -4,7 +4,10 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_curve, precision_recall_curve, classification_report, roc_auc_score, recall_score, accuracy_score, balanced_accuracy_score
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.model_selection import StratifiedKFold
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 def load_and_preprocess_data():
     # Load data
@@ -15,10 +18,6 @@ def load_and_preprocess_data():
 
 # New function to train and evaluate a basic model with default parameters
 def train_basic_model(X_train, X_test, y_train, y_test):
-    print("\n" + "="*50)
-    print("Training Basic Logistic Regression Model (Default Parameters)")
-    print("="*50)
-    
     # Create a basic logistic regression with default parameters
     basic_model = LogisticRegression(random_state=42)
     
@@ -43,12 +42,8 @@ def train_basic_model(X_train, X_test, y_train, y_test):
     
     print(f"\nBasic Model Performance (Optimal threshold = {optimal_threshold:.3f}):")
     print(f"Accuracy: {accuracy_optimal:.4f}")
-    print(f"Balanced Accuracy: {balanced_acc_optimal:.4f}")
     print(f"AUC Score: {auc:.4f}")
     print(f"Recall Score: {recall_optimal:.4f}")
-    
-    print("\nClassification Report (Basic Model, Optimal threshold):")
-    print(classification_report(y_test, y_pred_optimal))
     
     return basic_model, auc, recall_optimal, optimal_threshold
 
@@ -66,10 +61,6 @@ def train_model(df):
     
     # Train basic model first to establish baseline
     basic_model, basic_auc, basic_recall, basic_optimal_threshold = train_basic_model(X_train_scaled, X_test_scaled, y_train, y_test)
-    
-    print("\n" + "="*50)
-    print("Hyperparameter Tuning Process")
-    print("="*50)
     
     # Define different solver-penalty combinations to search for the best model parameters
     solvers_penalties = [
@@ -90,8 +81,6 @@ def train_model(df):
     
     # Try each solver-penalty combination
     for solver, penalty in solvers_penalties:
-        print(f"\nTrying solver={solver}, penalty={penalty}")
-        
         # Define base model
         log_model = LogisticRegression(
             solver=solver,
@@ -126,9 +115,6 @@ def train_model(df):
             # Fit and evaluate
             grid_search.fit(X_train_scaled, y_train)
             
-            print(f"Best score for this combination: {grid_search.best_score_:.4f}")
-            print(f"Best parameters: {grid_search.best_params_}")
-            
             # Update best model if current one is better
             if grid_search.best_score_ > best_score:
                 best_score = grid_search.best_score_
@@ -136,12 +122,7 @@ def train_model(df):
                 best_params = grid_search.best_params_
                 best_solver_penalty = (solver, penalty)
         except Exception as e:
-            print(f"Error with solver={solver}, penalty={penalty}: {str(e)}")
             continue
-    
-    print(f"\nBest overall solver-penalty combination: {best_solver_penalty}")
-    print(f"Best overall parameters: {best_params}")
-    print(f"Best overall score: {best_score:.4f}")
     
     # Make predictions with best model
     y_pred_proba = best_model.predict_proba(X_test_scaled)[:, 1]
@@ -152,64 +133,33 @@ def train_model(df):
     optimal_idx = np.argmax(j_scores)
     optimal_threshold_roc = thresholds[optimal_idx]
     
-    # Find optimal threshold for maximizing recall (with minimum precision constraint)
-    precisions, recalls, thresholds_pr = precision_recall_curve(y_test, y_pred_proba)
-    # Find threshold that gives at least 0.3 precision
-    valid_indices = precisions[:-1] >= 0.3  # Exclude the last point
-    if np.any(valid_indices):
-        valid_recalls = recalls[:-1][valid_indices]
-        valid_thresholds = thresholds_pr[valid_indices]
-        # Get threshold with highest recall among valid thresholds
-        best_recall_idx = np.argmax(valid_recalls)
-        optimal_threshold_recall = valid_thresholds[best_recall_idx]
-    else:
-        # If no threshold meets the precision requirement, use ROC threshold
-        optimal_threshold_recall = optimal_threshold_roc
-    
-    print("\nThreshold Optimization:")
-    print(f"ROC optimal threshold (Youden's J): {optimal_threshold_roc:.3f}")
-    print(f"Recall-optimized threshold: {optimal_threshold_recall:.3f}")
-    
-    # Calculate metrics with both thresholds
+    # Calculate metrics with optimal threshold
     y_pred_roc = (y_pred_proba >= optimal_threshold_roc).astype(int)
-    y_pred_recall = (y_pred_proba >= optimal_threshold_recall).astype(int)
     
     # Calculate metrics
     tuned_auc = roc_auc_score(y_test, y_pred_proba)
     
     # ROC threshold metrics
     accuracy_roc = accuracy_score(y_test, y_pred_roc)
-    balanced_acc_roc = balanced_accuracy_score(y_test, y_pred_roc)
     recall_roc = recall_score(y_test, y_pred_roc)
     
-    # Recall-optimized threshold metrics
-    accuracy_recall = accuracy_score(y_test, y_pred_recall)
-    balanced_acc_recall = balanced_accuracy_score(y_test, y_pred_recall)
-    recall_optimized = recall_score(y_test, y_pred_recall)
-    
-    print("\nMetrics with ROC optimal threshold:")
+    print("\nFine-tuned Model Performance Summary:")
+    print(f"Best solver-penalty: {best_solver_penalty}")
+    print(f"Best parameters: {best_params}")
+    print(f"Optimal threshold: {optimal_threshold_roc:.3f}")
     print(f"Accuracy: {accuracy_roc:.4f}")
-    print(f"Balanced Accuracy: {balanced_acc_roc:.4f}")
     print(f"AUC: {tuned_auc:.4f}")
     print(f"Recall: {recall_roc:.4f}")
-    print(classification_report(y_test, y_pred_roc))
-    
-    print("\nMetrics with Recall-optimized threshold:")
-    print(f"Accuracy: {accuracy_recall:.4f}")
-    print(f"Balanced Accuracy: {balanced_acc_recall:.4f}")
-    print(f"AUC: {tuned_auc:.4f}")
-    print(f"Recall: {recall_optimized:.4f}")
-    print(classification_report(y_test, y_pred_recall))
     
     # Choose the threshold that gives the best balanced performance
-    # We'll use the ROC threshold as it balances false positives and false negatives
     optimal_threshold = optimal_threshold_roc
     tuned_recall = recall_roc
     
     # Get feature importance
     feature_importance = pd.DataFrame({
         'feature': X.columns,
-        'importance': np.abs(best_model.coef_[0])
+        'importance': np.abs(best_model.coef_[0]),
+        'coefficient': best_model.coef_[0]  # Actual coefficient values
     }).sort_values('importance', ascending=False)
     
     # Add comparison of basic vs tuned model
@@ -220,7 +170,127 @@ def train_model(df):
     print(f"{'-'*60}")
     print(f"{'AUC':<15}{basic_auc:.4f}{'':<7}{tuned_auc:.4f}{'':<7}{((tuned_auc-basic_auc)/basic_auc)*100:.2f}%")
     print(f"{'Recall':<15}{basic_recall:.4f}{'':<7}{tuned_recall:.4f}{'':<7}{((tuned_recall-basic_recall)/basic_recall)*100:.2f}%")
-    print(f"\nOptimal thresholds: Basic model: {basic_optimal_threshold:.3f}, Fine-tuned model: {optimal_threshold:.3f}")
+    print(f"\nOptimal thresholds: Basic: {basic_optimal_threshold:.3f}, Fine-tuned: {optimal_threshold:.3f}")
+    
+    # Print model details for interpretation
+    print("\n" + "="*50)
+    print("LOGISTIC REGRESSION MODEL INTERPRETATION")
+    print("="*50)
+    
+    # Print intercept
+    print(f"Intercept: {best_model.intercept_[0]:.4f}")
+    
+    # Print coefficients with feature names
+    print("\nCoefficients (sorted by absolute value):")
+    for idx, row in feature_importance.head(15).iterrows():
+        # Determine the effect (positive or negative influence)
+        effect = "increases" if row['coefficient'] > 0 else "decreases"
+        print(f"{row['feature']:<25}: {row['coefficient']:+.4f} - {effect} probability of leaving")
+    
+    # Create visualizations
+    # 1. Coefficient plot
+    plt.figure(figsize=(12, 8))
+    plt.title('Logistic Regression Coefficients', fontsize=16)
+    
+    # Get top N most important features for clearer visualization
+    top_n = 15
+    top_features = feature_importance.head(top_n)
+    
+    # Create a new column for color coding
+    top_features['effect'] = ['Negative' if coef < 0 else 'Positive' for coef in top_features['coefficient']]
+    
+    # Use the user specified RGB colors
+    # Convert RGB to hex format or normalized RGB tuples
+    light_blue = (189/255, 217/255, 247/255)  # Light blue
+    light_orange = (255/255, 202/255, 167/255)  # Light orange/peach
+    
+    # Use the specified colors
+    color_palette = {"Positive": light_orange, "Negative": light_blue}
+    
+    # Plot with the new color scheme
+    ax = sns.barplot(x='coefficient', y='feature', data=top_features, hue='effect', palette=color_palette, dodge=False)
+    
+    # Add coefficient values on the bars
+    for i, row in enumerate(top_features.itertuples()):
+        # Format coefficient value with 3 decimal places
+        coef_text = f"{row.coefficient:.3f}"
+        
+        # Special case for "Products in use" - keep outside
+        if row.feature == "Products in use":
+            # Position text based on whether coefficient is positive or negative
+            if row.coefficient < 0:
+                # For negative values, place text to the left of the bar
+                text_x = row.coefficient - 0.01
+                ha = 'right'
+                color = 'black'
+            else:
+                # For positive values, place text to the right of the bar
+                text_x = row.coefficient + 0.01
+                ha = 'left'
+                color = 'black'
+        else:
+            # For all other features, place text inside the bar
+            if row.coefficient < 0:
+                # For negative values, place text inside bar toward right end
+                text_x = row.coefficient / 2  # Middle of the bar
+                ha = 'center'
+                color = 'black'  # Dark text on light blue
+            else:
+                # For positive values, place text inside bar toward left end
+                text_x = row.coefficient / 2  # Middle of the bar
+                ha = 'center'
+                color = 'black'  # Dark text on light orange
+        
+        # Add the text annotation
+        ax.text(text_x, i, coef_text, va='center', ha=ha, fontsize=10, color=color)
+    
+    plt.axvline(x=0, color='black', linestyle='--')
+    plt.xlabel('Coefficient Value', fontsize=14)
+    plt.ylabel('Feature', fontsize=14)
+    
+    # Move legend to a better position
+    plt.legend(title="Effect on Churn", loc="lower right")
+    
+    plt.tight_layout()
+    plt.savefig('logistic_regression_coefficients.png', dpi=300, bbox_inches='tight')
+    
+    # 2. Combined ROC Curve and Confusion Matrix
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
+    
+    # ROC Curve
+    ax1.plot(fpr, tpr, label=f'AUC = {tuned_auc:.4f}')
+    ax1.plot([0, 1], [0, 1], 'k--')
+    ax1.set_xlabel('False Positive Rate', fontsize=14)
+    ax1.set_ylabel('True Positive Rate', fontsize=14)
+    ax1.set_title('ROC Curve', fontsize=16)
+    ax1.legend(loc='lower right')
+    ax1.grid(True)
+    
+    # Confusion Matrix
+    cm = confusion_matrix(y_test, y_pred_roc)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['Stayed', 'Left'])
+    disp.plot(ax=ax2, cmap='Blues', values_format='d')
+    ax2.set_title('Confusion Matrix', fontsize=16)
+    
+    plt.tight_layout()
+    plt.savefig('logistic_regression_combined_plot.png', dpi=300, bbox_inches='tight')
+    
+    # Print practical suggestions based on the model
+    print("\n" + "="*50)
+    print("PRACTICAL INSIGHTS BASED ON MODEL RESULTS")
+    print("="*50)
+    
+    # Get top positive and negative features
+    top_pos = feature_importance[feature_importance['coefficient'] > 0].head(5)
+    top_neg = feature_importance[feature_importance['coefficient'] < 0].head(5)
+    
+    print("\nFactors that INCREASE customer churn risk:")
+    for idx, row in top_pos.iterrows():
+        print(f"- {row['feature']}: coefficient = {row['coefficient']:.4f}")
+    
+    print("\nFactors that DECREASE customer churn risk:")
+    for idx, row in top_neg.iterrows():
+        print(f"- {row['feature']}: coefficient = {row['coefficient']:.4f}")
     
     return best_model, feature_importance, (basic_auc, basic_recall, tuned_auc, tuned_recall)
 
@@ -230,10 +300,6 @@ def main():
     
     # Train model and get results
     model, feature_importance, metrics = train_model(df)
-    
-    # Print results
-    print("\nFeature Importance:")
-    print(feature_importance)
     
     return model
 

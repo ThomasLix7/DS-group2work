@@ -33,29 +33,13 @@ smote = SMOTE(random_state=17)
 X_train_smote, y_train_smote = smote.fit_resample(X_train_scaled, y_train)
 
 # ======================
-# 2. Logistic Regression (from logistic.py)
+# 2. KNN Implementation (from knn.py)
 # ======================
-from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
-
-# Train model with best parameters from logistic.py
-logit_model = LogisticRegression(
-    solver='saga',
-    penalty='elasticnet',
-    C=0.001,
-    l1_ratio=0.3,
-    class_weight={0:1, 1:4},
-    max_iter=5000,
-    random_state=17
-).fit(X_train_scaled, y_train)
 
 # Initialize results dictionary
 results = {}
-
-# ======================
-# 3. KNN Implementation (from knn.py)
-# ======================
-from sklearn.neighbors import KNeighborsClassifier
 
 knn_model = KNeighborsClassifier(
     n_neighbors=33,           # Updated from knn_updated.py best parameters
@@ -65,7 +49,7 @@ knn_model = KNeighborsClassifier(
 ).fit(X_train_scaled, y_train)
 
 # ======================
-# 4. XGBoost Implementation (from xgBoost.py)
+# 3. XGBoost Implementation (from xgBoost.py)
 # ======================
 from xgboost import XGBClassifier
 
@@ -74,9 +58,9 @@ scale_pos_weight = len(y[y==0]) / len(y[y==1])
 
 xgb_model = XGBClassifier(
     max_depth=3,           # From xgBoost.py best parameters
-    learning_rate=0.1,    
-    n_estimators=100,      
-    subsample=0.8,      
+    learning_rate=0.05,    # Updated from 0.1 to 0.05
+    n_estimators=200,      # Updated from 100 to 200
+    subsample=1.0,         # Updated from 0.8 to 1.0
     colsample_bytree=0.8,  
     eval_metric='auc',
     random_state=17,
@@ -84,7 +68,7 @@ xgb_model = XGBClassifier(
 ).fit(X_train, y_train)
 
 # ======================
-# 5. Neural Network (from nn.py)
+# 4. Neural Network (from nn.py)
 # ======================
 from sklearn.neural_network import MLPClassifier
 
@@ -102,20 +86,18 @@ nn_model = MLPClassifier(
 ).fit(X_train_scaled, y_train)
 
 # ======================
-# 6. Model Evaluation
+# 5. Model Evaluation
 # ======================
 from sklearn.metrics import roc_curve
 
 # Dictionary to store test data for each model
 test_data = {
-    'Logistic': (X_test_scaled, y_test),
     'KNN': (X_test_scaled, y_test),
     'XGBoost': (X_test, y_test),
     'NeuralNet': (X_test_scaled, y_test)
 }
 
 models = {
-    'Logistic': logit_model,
     'KNN': knn_model,
     'XGBoost': xgb_model,
     'NeuralNet': nn_model
@@ -172,7 +154,7 @@ for name, model in models.items():
     print(results[name]['Classification Report'])
 
 # ======================
-# 7. Report Generation
+# 6. Report Generation
 # ======================
 def generate_report(results):
     report = {
@@ -180,7 +162,6 @@ def generate_report(results):
         'auc_scores': {k: v['AUC'] for k,v in results.items()},
         'risk_thresholds': {k: v['Optimal Threshold'] for k,v in results.items()},
         'top_features': {
-            'Logistic': pd.Series(logit_model.coef_[0], index=X.columns),
             'XGBoost': pd.Series(xgb_model.feature_importances_, index=X.columns)
         }
     }
@@ -199,6 +180,5 @@ print(f"\nRisk Thresholds:")
 for model, threshold in final_report['risk_thresholds'].items():
     print(f"{model}: {threshold:.3f}")
 print(f"\nTop Features Importance:")
-for model in ['Logistic', 'XGBoost']:
-    print(f"\n{model} Feature Importance:")
-    print(final_report['top_features'][model].sort_values(ascending=False))
+print(f"\nXGBoost Feature Importance:")
+print(final_report['top_features']['XGBoost'].sort_values(ascending=False))
