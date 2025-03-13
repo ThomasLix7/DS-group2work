@@ -23,15 +23,6 @@ library(corrplot)
 ```{r}
 # Reading CSV files
 data <- read.csv("output.csv")
-# Handling of missing values 
-#data <- data %>% drop_na()   
-# Check for duplicate lines
-#data <- data %>% distinct()  
-```
-
-
-
-```{r}
 # descriptive statistics
 #summary(data)
 # Select the desired variable
@@ -61,6 +52,7 @@ ggplot(df_long, aes(x = factor(Left), y = value, fill = factor(Left))) +
        y = "Value") +
   theme_minimal()
 ```
+
 ```{r}
 ggplot(data, aes(x = as.factor(Source), y = Balance)) +
   geom_boxplot(fill = "#AFD3E7") +
@@ -100,6 +92,7 @@ p4 <- ggplot(data, aes(x = as.factor(Source), y = Tenure)) +
 (p1 | p2) / (p3 | p4) 
 
 ```
+
 ```{r}
 
 summary_data <- data %>%
@@ -194,9 +187,9 @@ p4 <- ggplot(data, aes(x = Products_in_Use)) +
 
 
 # Gender distribution
-#p5 <- ggplot(data, aes(x = Gender, fill = Gender)) +
-#  geom_bar() +
-#  labs(title = "Gender Distribution", x = "Gender", y = "Count")
+p5 <- ggplot(data, aes(x = Gender, fill = Gender)) +
+  geom_bar(width=0.5,fill = "#9A72C7", color = "black") +
+  labs(title = "Gender Distribution", x = "Gender", y = "Count")
 
 
 # Balance distribution
@@ -209,7 +202,7 @@ p7 <- ggplot(data, aes(x = Salary)) +
   geom_histogram(binwidth = 10000, fill = "#9A72C7", color = "black") +
   labs(title = "Salary Distribution", x = "Salary", y = "Count")
 
-(p1 | p2) / (p3 | p4) /( p6| p7)
+(p1 | p2) / (p3 | p4) /( p5|p6| p7)
 
 ```
 
@@ -218,7 +211,7 @@ p7 <- ggplot(data, aes(x = Salary)) +
 
 ```{r}
 # Calculating Correlation
-numeric_cols <- data %>% select(Salary, Balance, Tenure, Score, Age, Products_in_Use,Left)
+numeric_cols <- data %>% select(Salary, Balance, Tenure, Score, Age, Products_in_Use,Gender, Left)
 
 #numeric_cols <- data %>% select(where(is.numeric))
 cor_matrix <- cor(numeric_cols)
@@ -262,13 +255,12 @@ p4 <- ggplot(data, aes(x = Age, fill = factor(Left))) +
        fill = "Churn Status") +
   theme_minimal()
 
-p1
-p2
-p3
-p4
+
 (p1 | p2) / (p3 | p4) 
 
 ```
+
+
 ```{r}
 #Salary, Balance, Tenure, Score, Age, Products_in_Use,Left
 
@@ -298,9 +290,19 @@ p3 <- ggplot(data, aes(x = Salary, fill = factor(Left))) +
   theme_minimal()
 
  
+
+# Four Key Points in Calculating Salary
+salary_quantiles <- quantile(data$Salary, probs = c(0, 0.25, 0.50, 0.75, 1), na.rm = TRUE)
+
+# Split the Salary into bins.
 data$Salary_Bin <- cut(data$Salary, breaks = seq(0, max(data$Salary, na.rm = TRUE), by = 10000), right = FALSE)
-breaks_index <- seq(1, max(1, length(unique(data$Balance_Bin))), by = 2)
-scale_x_discrete(breaks = unique(data$Balance_Bin)[breaks_index])
+
+# Salary_Bin values for the four key scales selected (converted to characters to match ggplot)
+selected_bins <- unique(as.character(cut(salary_quantiles, 
+                                         breaks = seq(0, max(data$Salary, na.rm = TRUE), by = 10000), 
+                                         right = FALSE)))
+selected_labels <- as.character(round(salary_quantiles, 0))  # Rounding to the nearest whole number to avoid decimals
+
 
 p4 <- ggplot(data, aes(x = Salary_Bin, fill = factor(Left))) +
   geom_bar(position = "fill") +  
@@ -310,11 +312,21 @@ p4 <- ggplot(data, aes(x = Salary_Bin, fill = factor(Left))) +
        y = "Proportion",
        fill = "Churn Status") +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + # Rotate x-axis labels to prevent overlap
-  scale_x_discrete(breaks = unique(data$Balance_Bin)[breaks_index])
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate the x-axis scale to prevent overlap
+  scale_x_discrete(breaks = selected_bins, labels = selected_labels)  # only show min, 25%, 75%, max
+
+
 (p1 |p2)/ (p3|p4)
-  #scale_x_discrete(breaks = unique(data$Balance_Bin)[seq(1, length(unique(data$Balance_Bin)), by = 2)])  # Show only some of the labels
+
+
 ```
+
+
+
+                
+
+
+
 ```{r}
 #Salary, Balance, Tenure, Score, Age, Products_in_Use,Left
 
@@ -333,16 +345,36 @@ p2 <- ggplot(data, aes(x = factor(Left), y = Balance, fill = factor(Left))) +
   theme_minimal()
 
 
+
 p3 <- ggplot(data, aes(x = Balance, fill = factor(Left))) +
   geom_density(alpha = 0.9) +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
   labs(title = "Balance Density by Churn Status",
        x = "Balance",
        y = "Density") +
-  theme_minimal()
+  theme_minimal()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels to prevent overlap
+
+
+
+# Four Key Points in Calculating Balance
+Balance_quantiles <- quantile(data$Balance, probs = c(0, 0.5, 1), na.rm = TRUE)
+
+# Split the Balance into boxes.
+data$Balance_Bin <- cut(data$Balance, breaks = seq(0, max(data$Balance, na.rm = TRUE), by = 10000), right = FALSE)
+
+# Balance values for the four key scales selected (converted to characters to match ggplot)
+Balance_bins <- unique(as.character(cut(Balance_quantiles, 
+                                         breaks = seq(0, max(data$Balance, na.rm = TRUE), by = 10000), 
+                                         right = FALSE)))
+Balance_labels <- as.character(round(Balance_quantiles, 0))  # Rounding to the nearest whole number to avoid decimals
+
+
+#print(length(Balance_bins))
+#print(length(Balance_labels))
 
 # Bin the Balance into ranges
-data$Balance_Bin <- cut(data$Balance, breaks = seq(0, max(data$Balance, na.rm = TRUE), by = 10000), right = FALSE)
+#data$Balance_Bin <- cut(data$Balance, breaks = seq(0, max(data$Balance, na.rm = TRUE), by = 10000), right = FALSE)
 
 p4 <- ggplot(data, aes(x = Balance_Bin, fill = factor(Left))) +
   geom_bar(position = "fill") +  
@@ -353,10 +385,18 @@ p4 <- ggplot(data, aes(x = Balance_Bin, fill = factor(Left))) +
        fill = "Churn Status") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) + # Rotate x-axis labels to prevent overlap
-  scale_x_discrete(breaks = unique(data$Balance_Bin)[seq(1, length(unique(data$Balance_Bin)), by = 2)])  # Show only some of the labels
-#p1
-#p2
-#p3
+  scale_x_discrete(breaks = Balance_bins, labels = Balance_labels)  # only show min, 25%, 50%, 75%, max
+
+
+
+
+
+
+
+
+
+
+
 
 (p1 | p3)
 (p2 | p4)
@@ -428,11 +468,11 @@ p3 <- ggplot(data, aes(x = Score, fill = factor(Left))) +
        x = "Score",
        y = "Density") +
   theme_minimal()
-
-
-
+ 
+score_quantiles <- quantile(data$Score, probs = c(0, 0.2,0.4,0.6,0.8,1), na.rm = TRUE)
 data <- data %>%
-  mutate(Score_Binned = cut(Score, breaks = 20))  # Here can adjust the `breaks` to control the number of boxes.
+  mutate(Score_Binned = cut(Score, breaks = 20))
+score_bins <- unique(as.character(cut(score_quantiles, breaks = 20)))
 
 p4 <- ggplot(data, aes(x = Score_Binned, fill = factor(Left))) +
   geom_bar(position = "fill") +  # Make the data in each Score_Binned proportional
@@ -442,20 +482,29 @@ p4 <- ggplot(data, aes(x = Score_Binned, fill = factor(Left))) +
        y = "Proportion",
        fill = "Churn Status") +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels to prevent overlap
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+  # Rotate x-axis labels to prevent overlap
+  scale_x_discrete(breaks = score_bins)   
 
 (p1 | p4) /(p3 | p2)
+p4
+
 
 ```
 
 
+
+
 ```{r}
 #Products_in_Use vs Left
-p1 <- ggplot(data, aes(x =  Products_in_Use, fill = factor(Left))) +
-  geom_histogram(bins = 10, alpha = 0.7, position = "identity") +
-  scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
-  theme_minimal() + ggtitle("Products num vs. churn")
+data$Products_in_Use <- as.factor(data$Products_in_Use)
 
+p1 <- ggplot(data, aes(x = Products_in_Use, fill = factor(Left))) +
+  geom_bar(position = "stack") +  # 使用 geom_bar() 而不是 geom_histogram()
+  scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
+  theme_minimal() + 
+  ggtitle("Products num vs. churn")
+
+#p1
 p2 <- ggplot(data, aes(x = Products_in_Use, fill = factor(Left))) +
   geom_density(alpha = 0.5) +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -472,8 +521,31 @@ p3 <- ggplot(data, aes(x = Products_in_Use, fill = factor(Left))) +
        y = "Proportion",
        fill = "Churn Status") +
   theme_minimal()
+
 p1 | (p2 / p3)
+#p1
+#p1
+#p2
+#p3
 ```
+```{r}
+#print(nrow(data %>%filter(Products_in_Use == 1)))
+#print(nrow(data %>%filter(Products_in_Use == 2 )))
+#print(nrow(data %>%filter(Products_in_Use == 3 )))
+#print(nrow(data %>%filter(Products_in_Use == 4 )))
+#print('--------------')
+#print(nrow(data %>%filter(Products_in_Use == 1 & Left == 0)))
+#print(nrow(data %>%filter(Products_in_Use == 1 & Left == 1)))
+
+#print(nrow(data %>%filter(Products_in_Use == 2 & Left == 0)))
+#print(nrow(data %>%filter(Products_in_Use == 2 & Left == 1)))
+#print(nrow(data %>%filter(Products_in_Use == 3 & Left == 0)))
+#print(nrow(data %>%filter(Products_in_Use == 3 & Left == 1)))
+#print(nrow(data %>%filter(Products_in_Use == 4 & Left == 0)))
+#print(nrow(data %>%filter(Products_in_Use == 4 & Left == 1)))
+
+```
+
 
 
 ```{r}
@@ -507,6 +579,7 @@ p2 <- ggplot(data, aes(x = factor(Gender), fill = factor(Left))) +
 p1|p2
 
 ```
+
 
 
 
