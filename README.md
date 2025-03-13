@@ -9,8 +9,8 @@ Group work for Fundamental of data science
 5.每次处理后的数据将保存到output文件夹中，文件名为output.csv，并自动编号以区分不同版本。
 
 6.Score列大于850的数量有4个，删掉  
-
 7. 增加每一列的分布图用来识别异常值  
+
 Create a new environment or whatever you want, install the packages in the requirements.txt file by the command:
 ```
 pip install -r requirements.txt
