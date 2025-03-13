@@ -10,6 +10,13 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
+```{r}
+library(dplyr)
+library(knitr)
+library(ggplot2)
+library(caret)
+
+```
 
 
 ```{r}
@@ -39,9 +46,7 @@ data3$Source <- 3
 data <- rbind(data1, data2, data3)
 
 ```
-```{r}
 
-```
 
 
 ```{r}
@@ -53,6 +58,9 @@ str(data)
 #查看总体数据
 summary(data)
 ```
+```{r}
+str(data$Gender)
+```
 
 ```{r}
 #性别列转化为数值型： 男性为1，女性为0
@@ -62,7 +70,7 @@ data$Gender <- ifelse(data$Gender == "Male", 1, 0)
 
 
 ```{r}
-str(data)
+str(data$Gender)
 ```
 
 
@@ -82,6 +90,26 @@ if (missing_percentage < 5) {
 
 ```
 
+
+```{r}
+# 绘制饼图，显示缺失值占总体的比例
+# 复用已有的变量
+pie_data <- c(missing_rows, total_rows - missing_rows)  # 数据
+names(pie_data) <- c("Missing Rows", "Non-Missing Rows")  # 扇区名称
+
+# 创建自定义标签，显示数值和百分比
+labels <- c(
+  paste("Missing Rows\n", missing_rows, " (", round(missing_percentage, 2), "%)"),
+  paste("Non-Missing Rows\n", total_rows - missing_rows, " (", round(100 - missing_percentage, 2), "%)")
+)
+
+# 使用 base R 的 pie 函数绘制饼图
+pie(pie_data, labels = labels, col = c("orange", "lightblue"), main = "Missing vs. Non-Missing Rows")
+```
+
+
+
+
 ```{r}
 sum(duplicated(data))  # 统计重复行的数量
 ```
@@ -93,6 +121,22 @@ duplicate_rows <- data[duplicated(data), ]
 print(duplicate_rows)  # 显示重复值
 
 ```
+
+```{r}
+
+# 统计每个重复行出现的次数
+duplicate_counts <- data %>%
+  group_by_all() %>%  # 按所有列分组
+  filter(n() > 1) %>%  # 过滤出重复的行
+  summarise(count = n(), .groups = 'drop')  # 统计每组出现的次数
+
+# 以表格形式输出
+print(duplicate_counts)
+```
+
+
+
+
 ```{r}
 #删除完全相同的重复行（只保留第一条）
 data <- data[!duplicated(data), ]
@@ -102,6 +146,7 @@ data <- data[!duplicated(data), ]
 ```{r}
 sum(duplicated(data))  # 统计重复行的数量
 ```
+
 ```{r}
 #检查是否为整数
 columns_to_check <- c("Customer_ID", "Age", "Score", "Tenure", "Products_in_Use")
@@ -111,46 +156,130 @@ non_integer_count <- sum(sapply(data[columns_to_check], function(col) sum(col !=
 print(paste("非整数值的总数量:", non_integer_count))
 
 ```
-
-
 ```{r}
-
-
-#Salary列表示客户的预计年薪
-#最小值为11.58，我认为这是异常值，但是经过IQR方法显示不是异常值，需要讨论
-
-#Balance列为客户的余额
-#最小值为27288，最大值为214347，但是经过IQR方法显示是异常值，需要讨论
-
+# Gender列分布图
+# 绘制条形图
+ggplot(data, aes(x = factor(Gender))) +
+  geom_bar(fill = "lightblue") +
+  labs(title = "Gender Distribution",
+       x = "Gender",
+       y = "Count") +
+  theme_minimal() +
+  scale_x_discrete(labels = c("0" = "Female", "1" = "Male"))+
+  theme(plot.title = element_text(hjust = 0.5))
 ```
 
 
 
 ```{r}
-#统计score列大于850的数量
-count_above_850 <- sum(data$Score > 850)
 
-# 打印结果
-print(count_above_850)
+
+# 绘制柱状图，直接在 aes() 中使用 cut() 函数
+ggplot(data, aes(x = cut(Age, breaks = seq(0, max(data$Age) + 5, by = 5), right = FALSE))) +
+  geom_bar(fill = "lightblue", color = "black") +
+  labs(title = "Age Distribution (5-year intervals)",
+       x = "Age Group",
+       y = "Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # 标题居中
+
+```
+```{r}
+#查看Score列的分布
+breaks <- nclass.Sturges(data$Score)  # 自动计算区间数量
+hist(data$Score, probability = TRUE, breaks = breaks, main = "Score Distribution", col = "lightblue")
+lines(density(data$Score, na.rm = TRUE), col = "red", lwd = 2)
+```
+
+
+```{r}
+# 定义业务规则的异常值范围
+lower_limit <- 350
+upper_limit <- 850
+
+# 统计异常值
+outliers_business <- data$Score[data$Score < lower_limit | data$Score > upper_limit]
+outliers_business_count <- length(outliers_business)
+
+# 输出结果
+cat("Number of outliers (based on business rules):", outliers_business_count, "\n")
+print(outliers_business)
+```
+```{r}
+# 创建异常值表格
+outliers_table <- data.frame(
+  Index = which(data$Score < lower_limit | data$Score > upper_limit),
+  Score = data$Score[data$Score < lower_limit | data$Score > upper_limit]
+)
+
+# 打印表格
+print(outliers_table)
 ```
 
 ```{r}
-# 删除 Score 列值大于 850 的所有行
-data <- data[data$Score <= 850, ]
+# 准备饼图数据
+total_count <- nrow(data)  # 数据集总行数
+
+pie_data <- c(count_above_850, total_count - count_above_850)
+names(pie_data) <- c("Outliers", "Regular Values")
+
+# 计算百分比
+percentage_above_850 <- round((count_above_850 / total_count) * 100, 2)
+percentage_below_850 <- round((1 - count_above_850 / total_count) * 100, 2)
+
+# 创建自定义标签，显示数值和百分比
+labels <- c(paste("Outliers\n", count_above_850, " (", percentage_above_850, "%)"),
+            paste("Regular Values\n", total_count - count_above_850, " (", percentage_below_850, "%)"))
+
+# 绘制饼图
+pie(pie_data, labels = labels, col = c("orange", "lightblue"), main = "Outliers vs. Regular Values")
 ```
+
+```{r}
+# 删除异常值
+data <- subset(data, Score >= lower_limit & Score <= upper_limit)
+```
+
+
+```{r}
+# 统计异常值
+outliers_business <- data$Score[data$Score < lower_limit | data$Score > upper_limit]
+outliers_business_count <- length(outliers_business)
+
+# 输出结果
+cat("Number of outliers (based on business rules):", outliers_business_count, "\n")
+print(outliers_business)
+```
+```{r}
+#查看Score列的分布
+breaks <- nclass.Sturges(data$Score)  # 自动计算区间数量
+hist(data$Score, probability = TRUE, breaks = breaks, main = "Score Distribution (After)", col = "lightblue")
+lines(density(data$Score, na.rm = TRUE), col = "red", lwd = 2)
+```
+
+
 
 
 
 ```{r}
-df_sorted <- data[order(data$Salary, na.last = NA), ]  # 按 Salary 升序排序
-print(df_sorted)  # 查看结果
+#查看Tenure列的分布
+ggplot(data, aes(x = factor(Tenure))) +
+  geom_bar(fill = "lightblue") +
+  labs(title = "Tenure Distribution",
+       x = "Tenure",
+       y = "Count") +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))
+
 ```
+
+
 ```{r}
-boxplot(data$Salary, main = "Boxplot of Salary", ylab = "Salary", col = "orange")
-
+#查看Salary列的分布
+breaks <- nclass.Sturges(data$Salary)  # 自动计算区间数量
+hist(data$Salary, probability = TRUE, breaks = breaks, main = "Salary Distribution", col = "lightblue")
+lines(density(data$Salary, na.rm = TRUE), col = "red", lwd = 2)
 ```
-
-
 ```{r}
 # 计算 Salary 的 IQR
 Q1_salary <- quantile(data$Salary, 0.25, na.rm = TRUE)  # 第 1 四分位数
@@ -167,28 +296,67 @@ print(lower_bound_salary)
 outliers_salary <- data$Salary[data$Salary < lower_bound_salary | data$Salary > upper_bound_salary]
 print("Salary 异常值：")
 print(outliers_salary)
+```
 
+```{r}
+# 绘制箱线图并突出显示异常值
+ggplot(data, aes(y = Salary)) +
+  geom_boxplot(fill = "lightblue", outlier.color = "red", outlier.shape = 16, outlier.size = 2) +
+  labs(title = "Salary Distribution with Outliers",
+       y = "Salary") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # 居中标题
+```
+
+
+```{r}
 # 筛选出不在异常值范围内的数据
 data <- data[data$Salary >= lower_bound_salary & data$Salary <= upper_bound_salary, ]
 
-# 查看删除异常值后的数据集
-print("删除异常值后的数据集：")
-print(head(data))
-
 ```
+
+
 ```{r}
-hist(data$Salary, probability = TRUE, breaks = 50, main = "Salary Distribution", col = "lightblue")
+breaks <- nclass.Sturges(data$Salary)  # 自动计算区间数量
+hist(data$Salary, probability = TRUE, breaks = breaks, main = "Salary Distribution(After)", col = "lightblue")
 lines(density(data$Salary, na.rm = TRUE), col = "red", lwd = 2)
 
 ```
+```{r}
+# 绘制箱线图并突出显示异常值
+ggplot(data, aes(y = Salary)) +
+  geom_boxplot(fill = "lightblue", outlier.color = "red", outlier.shape = 16, outlier.size = 2) +
+  labs(title = "Salary Distribution with Outliers",
+       y = "Salary") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # 居中标题
+```
+
 
 
 
 ```{r}
-boxplot(data$Balance, main = "Boxplot of Balance", ylab = "Salary", col = "orange")
-
-
+#查看Balance列的分布
+breaks <- nclass.Sturges(data$Balance)  # 自动计算区间数量
+hist(data$Balance, probability = TRUE, breaks = breaks, main = "Balance Distribution", col = "lightblue")
+lines(density(data$Balance, na.rm = TRUE), col = "red", lwd = 2)
 ```
+```{r}
+#查看Products_in_Use列的分布
+# 绘制条形图
+ggplot(data, aes(x = factor(Products_in_Use))) +
+  geom_bar(fill = "lightblue") +
+  labs(title = "Products in Use Distribution",
+       x = "Products in Use",
+       y = "Count") +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+
+
+
 
 ```{r}
 # 计算 Balance 的 IQR
@@ -205,10 +373,8 @@ outliers_balance <- data$Balance[data$Balance < lower_bound_balance | data$Balan
 print("Balance 异常值：")
 print(outliers_balance)
 ```
-```{r}
-hist(data$Balance, probability = TRUE, breaks = 50, main = "Balance Distribution", col = "lightblue")
-lines(density(data$Balance, na.rm = TRUE), col = "red", lwd = 2)
-```
+
+
 
 ```{r}
 # 假设你的数据集名为 data
@@ -244,6 +410,9 @@ cat("Left 列中 0 的占比：", prop_0, "\n")
 
 
 
+```{r}
+str(data)
+```
 
 
 
@@ -287,52 +456,24 @@ write.csv(data, file = unique_filename, row.names = FALSE, quote = FALSE)
 # 输出最终保存的文件名
 cat("文件已保存为：", unique_filename, "\n")
 ```
-```{r}
-str(data)
-```
 
 
 
 
-```{r}
-pca <- prcomp(data[,-c(1,9)], scale. = TRUE)
-pca
-```
-
-
-```{r}
-pca$sdev^2/sum(pca$sdev^2)
-
-```
 
 
 
-```{r}
-cumsum(pca$sdev^2)/sum(pca$sdev^2)
-
-```
 
 
 
-```{r}
- pve1=cumsum(pca$sdev^2)/sum(pca$sdev^2)
- plot(pve1,t="b",col="blue",xlab="PC", xaxp=c(1,6,5),
- main="Proportionofvarianceexplained",ylab="")
- abline(h = 0.85, col = "red", lty = 2, lwd = 2)
- text(2, 0.88, "85% Variance Explained", col = "red")
-```
 
 
-```{r}
-
-```
 
 
-```{r}
-# 假设你的数据集名为 data
-count_table <- table(data$Left)
-print(count_table)
-```
+
+
+
+
 
 
 
