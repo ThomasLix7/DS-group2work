@@ -11,16 +11,16 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r}
+# Load the necessary library
 library(dplyr)
 library(knitr)
 library(ggplot2)
 library(caret)
-
 ```
 
 
 ```{r}
-
+# Load the datasets for the three branches
 data1  <- read.csv("Branch1.csv")
 data2  <- read.csv("Branch2.csv")
 data3  <- read.csv("Branch3.csv")
@@ -30,107 +30,116 @@ data3  <- read.csv("Branch3.csv")
 
 
 ```{r}
-#添加特征列Source，表示合并后的数据集来自不同的数据集
-# 为 data1 添加特征列，值为 1
+#  Add feature column Source to indicate that the merged dataset is from a different dataset
 data1$Source <- 1
-
-# 为 data2 添加特征列，值为 2
 data2$Source <- 2
-
-# 为 data3 添加特征列，值为 3
 data3$Source <- 3
 ```
 
 ```{r}
-# 合并三个数据框
+# Merge the three datasets into one
 data <- rbind(data1, data2, data3)
-
 ```
 
 
 
 ```{r}
+# View the structure of the merged dataset
 str(data)
 ```
 
 
 ```{r}
-#查看总体数据
+# View the summary of the dataset
 summary(data)
 ```
 ```{r}
+# View the structure of the column 'Gender'
 str(data$Gender)
 ```
 
 ```{r}
-#性别列转化为数值型： 男性为1，女性为0
+# Change the data type from character to number, Male is 1, Female is 0 
 data$Gender <- ifelse(data$Gender == "Male", 1, 0)
 
 ```
 
 
 ```{r}
+# View the structure of the changed column 'Gender'
 str(data$Gender)
 ```
 
 
 ```{r}
-missing_rows <- sum(!complete.cases(data))  # 统计至少有一个 NA 的行数
-total_rows <- nrow(data)  # 数据集总行数
-missing_percentage <- (missing_rows / total_rows) * 100  # 计算缺失率
-print(paste("至少有一个缺失值的行数:", missing_rows))
-print(paste("缺失值行的比例:", round(missing_percentage, 2), "%"))
+# Missing-Value Handling
 
-if (missing_percentage < 5) {
-  data <- na.omit(data)  # 删除所有包含 NA 的行
-  print("已删除包含 NA 的行。")
-} else {
-  print("缺失值超过 5%，建议填充。")
-}
+# Count the counts of rows that have 1 missing value at least
+missing_rows <- sum(!complete.cases(data))  
+# Count the total number of rows in the dataset
+total_rows <- nrow(data) 
+# Calculate the ratio of missing value rows to the total number of rows
+missing_percentage <- (missing_rows / total_rows) * 100  
+# Print the result
+print(paste("The counts of missing-value columns:", missing_rows))
+print(paste("The percentage of missing-value columns:", round(missing_percentage, 2), "%"))
+
 
 ```
 
 
 ```{r}
-# 绘制饼图，显示缺失值占总体的比例
-# 复用已有的变量
-pie_data <- c(missing_rows, total_rows - missing_rows)  # 数据
-names(pie_data) <- c("Missing Rows", "Non-Missing Rows")  # 扇区名称
+# Draw a pie chart to visualize the proportion between missing rows and total rows
 
-# 创建自定义标签，显示数值和百分比
+# Create the data from 
+pie_data <- c(missing_rows, total_rows - missing_rows)  
+names(pie_data) <- c("Missing Rows", "Non-Missing Rows")  
+
+# Create lable to show counts and percentage
 labels <- c(
   paste("Missing Rows\n", missing_rows, " (", round(missing_percentage, 2), "%)"),
   paste("Non-Missing Rows\n", total_rows - missing_rows, " (", round(100 - missing_percentage, 2), "%)")
 )
 
-# 使用 base R 的 pie 函数绘制饼图
-pie(pie_data, labels = labels, col = c("orange", "lightblue"), main = "Missing vs. Non-Missing Rows")
+# Plot a pie chart
+pie(pie_data, labels = labels, col = c("orangered", "steelblue1"), main = "Missing vs. Non-Missing Rows")
+```
+
+```{r}
+# Remove rows with missing value from the dataset
+data <- na.omit(data)
+```
+
+```{r}
+# Verify that missing values are removed successfully
+
+# Count the counts of rows that have 1 missing value at least
+missing_rows <- sum(!complete.cases(data))  
+print(paste("The counts of missing-value columns:", missing_rows))
+
+```
+
+
+```{r}
+# Calculate the number of duplicated rows 
+sum(duplicated(data))
 ```
 
 
 
-
 ```{r}
-sum(duplicated(data))  # 统计重复行的数量
-```
-
-
-
-```{r}
+# Show the duplicated rows
 duplicate_rows <- data[duplicated(data), ]
-print(duplicate_rows)  # 显示重复值
-
+print(duplicate_rows)
 ```
 
 ```{r}
-
-# 统计每个重复行出现的次数
+# Count the duplicateds for each row 
 duplicate_counts <- data %>%
-  group_by_all() %>%  # 按所有列分组
-  filter(n() > 1) %>%  # 过滤出重复的行
-  summarise(count = n(), .groups = 'drop')  # 统计每组出现的次数
+  group_by_all() %>%  
+  filter(n() > 1) %>%  
+  summarise(count = n(), .groups = 'drop')  
 
-# 以表格形式输出
 print(duplicate_counts)
 ```
 
@@ -138,29 +147,20 @@ print(duplicate_counts)
 
 
 ```{r}
-#删除完全相同的重复行（只保留第一条）
+# Remove duplicate rows( only keep one)
 data <- data[!duplicated(data), ]
 ```
 
 
 ```{r}
-sum(duplicated(data))  # 统计重复行的数量
+# Verify that remove duplicate rows successfully
+sum(duplicated(data)) 
 ```
 
 ```{r}
-#检查是否为整数
-columns_to_check <- c("Customer_ID", "Age", "Score", "Tenure", "Products_in_Use")
-
-non_integer_count <- sum(sapply(data[columns_to_check], function(col) sum(col != floor(col), na.rm = TRUE)))
-
-print(paste("非整数值的总数量:", non_integer_count))
-
-```
-```{r}
-# Gender列分布图
-# 绘制条形图
+# Plot a bar chart for gender distribution
 ggplot(data, aes(x = factor(Gender))) +
-  geom_bar(fill = "lightblue") +
+  geom_bar(fill = "steelblue1") +
   labs(title = "Gender Distribution",
        x = "Gender",
        y = "Count") +
@@ -172,89 +172,88 @@ ggplot(data, aes(x = factor(Gender))) +
 
 
 ```{r}
+# Plot a bar chart for Age distribution grouped in 5-year intervals
 
-
-# 绘制柱状图，直接在 aes() 中使用 cut() 函数
 ggplot(data, aes(x = cut(Age, breaks = seq(0, max(data$Age) + 5, by = 5), right = FALSE))) +
-  geom_bar(fill = "lightblue", color = "black") +
+  geom_bar(fill = "steelblue1", color = "black") +
   labs(title = "Age Distribution (5-year intervals)",
        x = "Age Group",
        y = "Count") +
   theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5))  # 标题居中
+  theme(plot.title = element_text(hjust = 0.5))
 
 ```
 ```{r}
-#查看Score列的分布
-breaks <- nclass.Sturges(data$Score)  # 自动计算区间数量
-hist(data$Score, probability = TRUE, breaks = breaks, main = "Score Distribution", col = "lightblue")
-lines(density(data$Score, na.rm = TRUE), col = "red", lwd = 2)
+# Plot a histogram of scores with a kernel density curve
+breaks <- nclass.Sturges(data$Score)
+hist(data$Score, probability = TRUE, breaks = breaks, main = "Score Distribution", col = "steelblue1")
+lines(density(data$Score, na.rm = TRUE), col = "orangered", lwd = 2)
 ```
 
 
 ```{r}
-# 定义业务规则的异常值范围
+# Detect outliers based on business rules(scores below 350 or above 850)
 lower_limit <- 350
 upper_limit <- 850
 
-# 统计异常值
+# Detect outliers
 outliers_business <- data$Score[data$Score < lower_limit | data$Score > upper_limit]
+# Count the number of outliers
 outliers_business_count <- length(outliers_business)
 
-# 输出结果
 cat("Number of outliers (based on business rules):", outliers_business_count, "\n")
 print(outliers_business)
 ```
 ```{r}
-# 创建异常值表格
+# Create a table with indices and scores of outliers
 outliers_table <- data.frame(
   Index = which(data$Score < lower_limit | data$Score > upper_limit),
   Score = data$Score[data$Score < lower_limit | data$Score > upper_limit]
 )
 
-# 打印表格
+# Print the outliers table
+
 print(outliers_table)
 ```
 
 ```{r}
-# 准备饼图数据
-total_count <- nrow(data)  # 数据集总行数
+# Total number of rows in the dataset
+total_count <- nrow(data)
 
 pie_data <- c(count_above_850, total_count - count_above_850)
 names(pie_data) <- c("Outliers", "Regular Values")
 
-# 计算百分比
+# Calculate the percentage
 percentage_above_850 <- round((count_above_850 / total_count) * 100, 2)
 percentage_below_850 <- round((1 - count_above_850 / total_count) * 100, 2)
 
-# 创建自定义标签，显示数值和百分比
+# Create lable to show counts and percentage
 labels <- c(paste("Outliers\n", count_above_850, " (", percentage_above_850, "%)"),
             paste("Regular Values\n", total_count - count_above_850, " (", percentage_below_850, "%)"))
 
-# 绘制饼图
-pie(pie_data, labels = labels, col = c("orange", "lightblue"), main = "Outliers vs. Regular Values")
+# plot a pie chart
+pie(pie_data, labels = labels, col = c("orangered", "steelblue1"), main = "Outliers vs. Regular Values")
 ```
 
 ```{r}
-# 删除异常值
+# Remove outliers
 data <- subset(data, Score >= lower_limit & Score <= upper_limit)
 ```
 
 
 ```{r}
-# 统计异常值
+# Verify that remove outliers successfully
 outliers_business <- data$Score[data$Score < lower_limit | data$Score > upper_limit]
 outliers_business_count <- length(outliers_business)
 
-# 输出结果
 cat("Number of outliers (based on business rules):", outliers_business_count, "\n")
 print(outliers_business)
 ```
 ```{r}
-#查看Score列的分布
-breaks <- nclass.Sturges(data$Score)  # 自动计算区间数量
-hist(data$Score, probability = TRUE, breaks = breaks, main = "Score Distribution (After)", col = "lightblue")
-lines(density(data$Score, na.rm = TRUE), col = "red", lwd = 2)
+# Plot a histogram of scores with a kernel density curve
+breaks <- nclass.Sturges(data$Score)  # 
+hist(data$Score, probability = TRUE, breaks = breaks, main = "Score Distribution (After)", col = "steelblue1")
+lines(density(data$Score, na.rm = TRUE), col = "orangered", lwd = 2)
 ```
 
 
@@ -262,9 +261,9 @@ lines(density(data$Score, na.rm = TRUE), col = "red", lwd = 2)
 
 
 ```{r}
-#查看Tenure列的分布
+# Plot a bar plot of Tenure distribution
 ggplot(data, aes(x = factor(Tenure))) +
-  geom_bar(fill = "lightblue") +
+  geom_bar(fill = "steelblue1") +
   labs(title = "Tenure Distribution",
        x = "Tenure",
        y = "Count") +
@@ -275,77 +274,91 @@ ggplot(data, aes(x = factor(Tenure))) +
 
 
 ```{r}
-#查看Salary列的分布
-breaks <- nclass.Sturges(data$Salary)  # 自动计算区间数量
-hist(data$Salary, probability = TRUE, breaks = breaks, main = "Salary Distribution", col = "lightblue")
-lines(density(data$Salary, na.rm = TRUE), col = "red", lwd = 2)
+# Plot a histogram of Salary with a kernel density curve
+breaks <- nclass.Sturges(data$Salary)  
+hist(data$Salary, probability = TRUE, breaks = breaks, main = "Salary Distribution", col = "steelblue1")
+lines(density(data$Salary, na.rm = TRUE), col = "orangered", lwd = 2)
 ```
 ```{r}
-# 计算 Salary 的 IQR
-Q1_salary <- quantile(data$Salary, 0.25, na.rm = TRUE)  # 第 1 四分位数
-Q3_salary <- quantile(data$Salary, 0.75, na.rm = TRUE)  # 第 3 四分位数
-IQR_salary <- Q3_salary - Q1_salary  # 计算 IQR
+# Calculate the IQR of Salary
+Q1_salary <- quantile(data$Salary, 0.25, na.rm = TRUE)  
+Q3_salary <- quantile(data$Salary, 0.75, na.rm = TRUE)  
+IQR_salary <- Q3_salary - Q1_salary  
 
-# 计算 Salary 的异常值范围
+# Calculate the outlier range for Salary
 lower_bound_salary <- Q1_salary - 1.5 * IQR_salary
 upper_bound_salary <- Q3_salary + 1.5 * IQR_salary
 
-print(lower_bound_salary)
-
-# 找出 Salary 的异常值
+# Identify outliers in Salary
 outliers_salary <- data$Salary[data$Salary < lower_bound_salary | data$Salary > upper_bound_salary]
-print("Salary 异常值：")
-print(outliers_salary)
+cat("Salary outliers:", outliers_salary, "\n")
+
 ```
 
 ```{r}
-# 绘制箱线图并突出显示异常值
+# Plot a boxplot of Salary distribution and highlight outliers
 ggplot(data, aes(y = Salary)) +
-  geom_boxplot(fill = "lightblue", outlier.color = "red", outlier.shape = 16, outlier.size = 2) +
+  geom_boxplot(fill = "steelblue1", outlier.color = "orangered", outlier.shape = 16, outlier.size = 2) +
   labs(title = "Salary Distribution with Outliers",
        y = "Salary") +
   theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5))  # 居中标题
+  theme(plot.title = element_text(hjust = 0.5)) 
 ```
 
 
 ```{r}
-# 筛选出不在异常值范围内的数据
+# Remove outliers
 data <- data[data$Salary >= lower_bound_salary & data$Salary <= upper_bound_salary, ]
 
 ```
 
 
 ```{r}
-breaks <- nclass.Sturges(data$Salary)  # 自动计算区间数量
-hist(data$Salary, probability = TRUE, breaks = breaks, main = "Salary Distribution(After)", col = "lightblue")
-lines(density(data$Salary, na.rm = TRUE), col = "red", lwd = 2)
+# Plot a histogram of Salary with a kernel density curve
+breaks <- nclass.Sturges(data$Salary)  
+hist(data$Salary, probability = TRUE, breaks = breaks, main = "Salary Distribution(After)", col = "steelblue1")
+lines(density(data$Salary, na.rm = TRUE), col = "orangered", lwd = 2)
 
 ```
 ```{r}
-# 绘制箱线图并突出显示异常值
+# Select the data that is below 500
+low_salary_data <- data[data$Salary < 500, ]
+
+# Plot a histogram of Salary with a kernel density curve
+breaks <- nclass.Sturges(low_salary_data$Salary)
+hist(low_salary_data$Salary, probability = TRUE, breaks = breaks, main = "Salary Distribution(After)", col = "steelblue1")
+lines(density(low_salary_data$Salary, na.rm = TRUE), col = "orangered", lwd = 2)
+```
+
+
+
+
+
+
+```{r}
+# Plot a boxplot of Salary distribution and highlight outliers
 ggplot(data, aes(y = Salary)) +
-  geom_boxplot(fill = "lightblue", outlier.color = "red", outlier.shape = 16, outlier.size = 2) +
+  geom_boxplot(fill = "steelblue1", outlier.color = "tan1", outlier.shape = 16, outlier.size = 2) +
   labs(title = "Salary Distribution with Outliers",
        y = "Salary") +
   theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5))  # 居中标题
+  theme(plot.title = element_text(hjust = 0.5)) 
 ```
 
 
 
 
+
 ```{r}
-#查看Balance列的分布
-breaks <- nclass.Sturges(data$Balance)  # 自动计算区间数量
-hist(data$Balance, probability = TRUE, breaks = breaks, main = "Balance Distribution", col = "lightblue")
-lines(density(data$Balance, na.rm = TRUE), col = "red", lwd = 2)
+# Plot a histogram of Balance with a kernel density curve
+breaks <- nclass.Sturges(data$Balance)
+hist(data$Balance, probability = TRUE, breaks = breaks, main = "Balance Distribution", col = "steelblue1")
+lines(density(data$Balance, na.rm = TRUE), col = "orangered", lwd = 2)
 ```
 ```{r}
-#查看Products_in_Use列的分布
-# 绘制条形图
+# Plot a bar chart for Products_in_Use distribution 
 ggplot(data, aes(x = factor(Products_in_Use))) +
-  geom_bar(fill = "lightblue") +
+  geom_bar(fill = "steelblue1") +
   labs(title = "Products in Use Distribution",
        x = "Products in Use",
        y = "Count") +
@@ -359,102 +372,58 @@ ggplot(data, aes(x = factor(Products_in_Use))) +
 
 
 ```{r}
-# 计算 Balance 的 IQR
-Q1_balance <- quantile(data$Balance, 0.25, na.rm = TRUE)  # 第 1 四分位数
-Q3_balance <- quantile(data$Balance, 0.75, na.rm = TRUE)  # 第 3 四分位数
-IQR_balance <- Q3_balance - Q1_balance  # 计算 IQR
+# Calculate the IQR of Salary
+Q1_balance <- quantile(data$Balance, 0.25, na.rm = TRUE)  
+Q3_balance <- quantile(data$Balance, 0.75, na.rm = TRUE)  
+IQR_balance <- Q3_balance - Q1_balance  
 
-# 计算 Balance 的异常值范围
+# Calculate the outlier range for Balance
 lower_bound_balance <- Q1_balance - 1.5 * IQR_balance
 upper_bound_balance <- Q3_balance + 1.5 * IQR_balance
 
-# 找出 Balance 的异常值
+# Finding outliers in Balance
 outliers_balance <- data$Balance[data$Balance < lower_bound_balance | data$Balance > upper_bound_balance]
-print("Balance 异常值：")
-print(outliers_balance)
-```
+cat("Balance outliers:", outliers_balance, "\n")
 
-
-
-```{r}
-# 假设你的数据集名为 data
-count_table <- table(data$Left)
-print(count_table)
-```
-
-
-```{r}
-# 筛选出 Balance 列为 0 的数据
-data_balance_0 <- data[data$Balance == 0, ]
-prop=nrow(data_balance_0)/nrow(data)
-cat("余额为0的账户的占比：", prop, "\n")
-# 统计 Left 列中 1 的数量
-count_1 <- sum(data_balance_0$Left == 1)
-
-# 统计 Left 列中 0 的数量
-count_0 <- sum(data_balance_0$Left == 0)
-# 计算 Left 列中 1 的占比
-prop_1 <- count_1 / (count_1 + count_0)
-
-
-# 计算 Left 列中 0 的占比
-prop_0 <- count_0 / (count_1 + count_0)
-# 输出占比结果
-print(count_1)
-print(count_0)
-cat("Left 列中 1 的占比：", prop_1, "\n")
-cat("Left 列中 0 的占比：", prop_0, "\n")
 ```
 
 
 
 
 
+
 ```{r}
+# View the modified dataset structure
 str(data)
 ```
 
 
 
+
+
 ```{r}
-#查看总体数据
+# Display the summary of modified dataset
 summary(data)
 ```
 
 
 ```{r}
-# 定义一个函数，用于生成不重复的文件名
-generate_unique_filename <- function(base_name, path) {
-  counter <- 0
-  filename <- paste0(path, base_name)  # 拼接路径和基础文件名
-  while (file.exists(filename)) {
-    counter <- counter + 1
-    # 拼接路径和带编号的文件名
-    filename <- paste0(path, tools::file_path_sans_ext(base_name), "(", counter, ").", tools::file_ext(base_name))
-  }
-  return(filename)
-}
-
-# 基础文件名
 base_name <- "output.csv"
 
-# 指定保存路径（Windows系统中使用正斜杠或双反斜杠）
-output_path <- "output/"  # 或者 "C:/output/" 如果需要指定绝对路径
+# Specify the save path
+output_path <- "output/"
 
-# 检查路径是否存在，如果不存在则创建
+# Check if the path exists, and create it if it doesn't
 if (!dir.exists(output_path)) {
   dir.create(output_path, recursive = TRUE)
 }
 
-# 生成不重复的文件名（传入路径和基础文件名）
-unique_filename <- generate_unique_filename(base_name, output_path)
+output_file <- paste0(output_path, base_name)
 
+# Save the modified dataset to a CSV file and overwrite the file that has the same name
+write.csv(data, file = output_file, row.names = FALSE, quote = FALSE)
 
-# 保存数据到CSV文件
-write.csv(data, file = unique_filename, row.names = FALSE, quote = FALSE)
-
-# 输出最终保存的文件名
-cat("文件已保存为：", unique_filename, "\n")
+cat("The file is saved:", output_file, "\n")
 ```
 
 
