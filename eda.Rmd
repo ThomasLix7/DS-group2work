@@ -54,47 +54,49 @@ ggplot(df_long, aes(x = factor(Left), y = value, fill = factor(Left))) +
 ```
 
 ```{r}
+# Boxplot for features by branch
+#Boxplot of balance
 ggplot(data, aes(x = as.factor(Source), y = Balance)) +
   geom_boxplot(fill = "#AFD3E7") +
   labs(title = "Boxplot of Balance by Source",
        x = "Source",
        y = "Balance") +
   theme_minimal()
-
+#Boxplot of Salary
 p1 <- ggplot(data, aes(x = as.factor(Source), y = Salary)) +
   geom_boxplot(fill = "#AFD3E7") +
   labs(title = "Boxplot of Salary by Source",
        x = "Source",
        y = "Salary") +
   theme_minimal()
-
+#Boxplot for source
 p2 <- ggplot(data, aes(x = as.factor(Source), y = Score)) +
   geom_boxplot(fill = "#AFD3E7") +
   labs(title = "Boxplot of Score by Source",
        x = "Source",
        y = "Score") +
   theme_minimal()
-
+#Boxplot for Age 
 p3 <- ggplot(data, aes(x = as.factor(Source), y = Age)) +
   geom_boxplot(fill = "#AFD3E7") +
   labs(title = "Boxplot of Age by Source",
        x = "Source",
        y = "Age") +
   theme_minimal()
-
+#Boxplot for Tenure
 p4 <- ggplot(data, aes(x = as.factor(Source), y = Tenure)) +
   geom_boxplot(fill = "#AFD3E7") +
   labs(title = "Boxplot of Tenure by Source",
        x = "Source",
        y = "Tenure") +
   theme_minimal()
-
+#Show charts
 (p1 | p2) / (p3 | p4) 
 
 ```
 
 ```{r}
-
+#Select left data and order by branch
 summary_data <- data %>%
   group_by(Source, Left) %>%
   summarise(Count = n(), .groups = 'drop')
@@ -102,7 +104,7 @@ summary_data <- data %>%
 # View Statistics
 #print(summary_data)
 
-# plot
+# Count plot for Churned numbers
 p1 <- ggplot(summary_data, aes(x = as.factor(Source), y = Count, fill = as.factor(Left))) +
   geom_bar(stat = "identity", position = "dodge") +   
   labs(title = "Count of Left by Source",
@@ -111,7 +113,7 @@ p1 <- ggplot(summary_data, aes(x = as.factor(Source), y = Count, fill = as.facto
        fill = "Churn Status") +   
   scale_fill_manual(values = c("0" = "#AFD3E7", "1" = "#9A72C7")) +  
   theme_minimal()
-
+#Proportion plot for Churn rate 
 p2 <- ggplot(summary_data, aes(x = as.factor(Source), y = Count, fill = as.factor(Left))) +
   geom_bar(stat = "identity", position = "fill") +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -120,6 +122,8 @@ p2 <- ggplot(summary_data, aes(x = as.factor(Source), y = Count, fill = as.facto
        y = "Proportion",
        fill = "Churn Status") +
   theme_minimal()
+
+#Show charts
 p1|p2
 
 ```
@@ -150,7 +154,7 @@ box_plot <- ggplot(df, aes(x = Age, y = Left, fill = Left)) +
        y = "Retention Status") +
   theme_minimal()
 
-
+# Combination of hist_plot and box_plot 
 combined_plot <- hist_plot / box_plot +
   plot_layout(heights = c(3, 1))  # Adjust the height ratio of the top and bottom images
 
@@ -164,13 +168,10 @@ print(combined_plot)
 
 
 ```{r}
-
-
 # Credit score distribution
 p1 <- ggplot(data, aes(x = Score)) + 
   geom_histogram(bins = 30, fill = "#9A72C7",  color = "black") +
   theme_minimal() + ggtitle("Credit score distribution布")
-
 # Age distribution
 p2 <- ggplot(data, aes(x = Age)) +
   geom_histogram(binwidth = 5, fill = "#9A72C7", color = "black") +
@@ -202,6 +203,7 @@ p7 <- ggplot(data, aes(x = Salary)) +
   geom_histogram(binwidth = 10000, fill = "#9A72C7", color = "black") +
   labs(title = "Salary Distribution", x = "Salary", y = "Count")
 
+#Show charts
 (p1 | p2) / (p3 | p4) /( p5|p6| p7)
 
 ```
@@ -212,12 +214,10 @@ p7 <- ggplot(data, aes(x = Salary)) +
 ```{r}
 # Calculating Correlation
 numeric_cols <- data %>% select(Salary, Balance, Tenure, Score, Age, Products_in_Use,Gender, Left)
-
-#numeric_cols <- data %>% select(where(is.numeric))
+#Draw the Correlation plot
 cor_matrix <- cor(numeric_cols)
-#corrplot(cor_matrix, method = "color", type = "upper", tl.cex = 0.7)
 corrplot(cor_matrix, method = "color", type = "upper", tl.cex = 0.7,
-         col = colorRampPalette(c("skyblue", "white", "#9A72C7"))(200))  # 从蓝到白再到红
+         col = colorRampPalette(c("skyblue", "white", "#9A72C7"))(200))  # From blue to white to red
 
 
 ```
@@ -229,6 +229,8 @@ p1 <- ggplot(data, aes(x = Age, fill = factor(Left))) +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
   theme_minimal() + ggtitle("Age vs. churn")
 
+
+#Age Distribution by Churn Status
 p2 <- ggplot(data, aes(x = factor(Left), y = Age, fill = factor(Left))) +
   geom_boxplot(alpha = 0.6) +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -237,7 +239,7 @@ p2 <- ggplot(data, aes(x = factor(Left), y = Age, fill = factor(Left))) +
        y = "Age") +
   theme_minimal()
 
-
+#Age Density by Churn Status
 p3 <- ggplot(data, aes(x = Age, fill = factor(Left))) +
   geom_density(alpha = 0.5) +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -246,6 +248,7 @@ p3 <- ggplot(data, aes(x = Age, fill = factor(Left))) +
        y = "Density") +
   theme_minimal()
 
+#Proportion of Churn Rate by Age
 p4 <- ggplot(data, aes(x = Age, fill = factor(Left))) +
   geom_bar(position = "fill") +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -255,7 +258,7 @@ p4 <- ggplot(data, aes(x = Age, fill = factor(Left))) +
        fill = "Churn Status") +
   theme_minimal()
 
-
+#Show charts
 (p1 | p2) / (p3 | p4) 
 
 ```
@@ -269,7 +272,7 @@ p1 <- ggplot(data, aes(x = Salary, fill = factor(Left))) +
   geom_histogram(bins = 25, alpha = 0.7, position = "identity") +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
   theme_minimal() + ggtitle("Salary vs. churn")
-
+#Salary Distribution by Churn Status
 p2 <- ggplot(data, aes(x = factor(Left), y = Salary, fill = factor(Left))) +
   geom_boxplot(alpha = 0.6) +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -277,10 +280,7 @@ p2 <- ggplot(data, aes(x = factor(Left), y = Salary, fill = factor(Left))) +
        x = "Churn Status (0 = Retained, 1 = Churned)",
        y = "Salary") +
   theme_minimal()
-
-
-
-
+#Salary Density by Churn Status
 p3 <- ggplot(data, aes(x = Salary, fill = factor(Left))) +
   geom_density(alpha = 0.5) +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -289,9 +289,7 @@ p3 <- ggplot(data, aes(x = Salary, fill = factor(Left))) +
        y = "Density") +
   theme_minimal()
 
- 
-
-# Four Key Points in Calculating Salary
+# Five Key Points in Calculating Salary
 salary_quantiles <- quantile(data$Salary, probs = c(0, 0.25, 0.50, 0.75, 1), na.rm = TRUE)
 
 # Split the Salary into bins.
@@ -303,7 +301,7 @@ selected_bins <- unique(as.character(cut(salary_quantiles,
                                          right = FALSE)))
 selected_labels <- as.character(round(salary_quantiles, 0))  # Rounding to the nearest whole number to avoid decimals
 
-
+#Proportion of Churn Rate by Salary
 p4 <- ggplot(data, aes(x = Salary_Bin, fill = factor(Left))) +
   geom_bar(position = "fill") +  
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -313,9 +311,9 @@ p4 <- ggplot(data, aes(x = Salary_Bin, fill = factor(Left))) +
        fill = "Churn Status") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate the x-axis scale to prevent overlap
-  scale_x_discrete(breaks = selected_bins, labels = selected_labels)  # only show min, 25%, 75%, max
+  scale_x_discrete(breaks = selected_bins, labels = selected_labels)  # only show min, 25%, 50%, 75%, max
 
-
+#Show charts
 (p1 |p2)/ (p3|p4)
 
 
@@ -335,7 +333,7 @@ p1 <- ggplot(data, aes(x = Balance, fill = factor(Left))) +
   geom_histogram(bins = 25, alpha = 0.9, position = "identity") +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
   theme_minimal() + ggtitle("Balance vs. churn")
-
+#Balance Distribution by Churn Status
 p2 <- ggplot(data, aes(x = factor(Left), y = Balance, fill = factor(Left))) +
   geom_boxplot(alpha = 0.9) +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -343,9 +341,7 @@ p2 <- ggplot(data, aes(x = factor(Left), y = Balance, fill = factor(Left))) +
        x = "Churn Status (0 = Retained, 1 = Churned)",
        y = "Balance") +
   theme_minimal()
-
-
-
+#Balance Density by Churn Status
 p3 <- ggplot(data, aes(x = Balance, fill = factor(Left))) +
   geom_density(alpha = 0.9) +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -356,26 +352,19 @@ p3 <- ggplot(data, aes(x = Balance, fill = factor(Left))) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels to prevent overlap
 
 
-
-# Four Key Points in Calculating Balance
+# Three Key Points in Calculating Balance
 Balance_quantiles <- quantile(data$Balance, probs = c(0, 0.5, 1), na.rm = TRUE)
 
 # Split the Balance into boxes.
 data$Balance_Bin <- cut(data$Balance, breaks = seq(0, max(data$Balance, na.rm = TRUE), by = 10000), right = FALSE)
 
-# Balance values for the four key scales selected (converted to characters to match ggplot)
+# Balance values for the 3 key scales selected (converted to characters to match ggplot)
 Balance_bins <- unique(as.character(cut(Balance_quantiles, 
                                          breaks = seq(0, max(data$Balance, na.rm = TRUE), by = 10000), 
                                          right = FALSE)))
 Balance_labels <- as.character(round(Balance_quantiles, 0))  # Rounding to the nearest whole number to avoid decimals
 
-
-#print(length(Balance_bins))
-#print(length(Balance_labels))
-
-# Bin the Balance into ranges
-#data$Balance_Bin <- cut(data$Balance, breaks = seq(0, max(data$Balance, na.rm = TRUE), by = 10000), right = FALSE)
-
+#Proportion of Churn Rate by Balance
 p4 <- ggplot(data, aes(x = Balance_Bin, fill = factor(Left))) +
   geom_bar(position = "fill") +  
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -385,19 +374,9 @@ p4 <- ggplot(data, aes(x = Balance_Bin, fill = factor(Left))) +
        fill = "Churn Status") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) + # Rotate x-axis labels to prevent overlap
-  scale_x_discrete(breaks = Balance_bins, labels = Balance_labels)  # only show min, 25%, 50%, 75%, max
+  scale_x_discrete(breaks = Balance_bins, labels = Balance_labels)  # only show min, 50%, max
 
-
-
-
-
-
-
-
-
-
-
-
+#Show charts
 (p1 | p3)
 (p2 | p4)
 
@@ -413,6 +392,7 @@ p1 <- ggplot(data, aes(x = Tenure, fill = factor(Left))) +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
   theme_minimal() + ggtitle("Tenure vs. churn")
 
+#Boxplot of Tenure by Churn Status
 p2 <- ggplot(data, aes(x = factor(Left), y = Tenure, fill = factor(Left))) +
   geom_boxplot(alpha = 0.7) +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -421,7 +401,7 @@ p2 <- ggplot(data, aes(x = factor(Left), y = Tenure, fill = factor(Left))) +
        y = "Tenure") +
   theme_minimal()
 
-
+#Tenure Density by Churn Status
 p3 <- ggplot(data, aes(x = Tenure, fill = factor(Left))) +
   geom_density(alpha = 0.5) +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -429,7 +409,7 @@ p3 <- ggplot(data, aes(x = Tenure, fill = factor(Left))) +
        x = "Tenure",
        y = "Density") +
   theme_minimal()
-
+#Proportion of Churn Rate by Tenure
 p4 <- ggplot(data, aes(x = Tenure, fill = factor(Left))) +
   geom_bar(position = "fill") +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -438,7 +418,7 @@ p4 <- ggplot(data, aes(x = Tenure, fill = factor(Left))) +
        y = "Proportion",
        fill = "Churn Status") +
   theme_minimal()
-
+#Show charts
 (p1 | p4) /(p3 | p2)
 ```
 
@@ -451,7 +431,7 @@ p1 <- ggplot(data, aes(x = Score, fill = factor(Left))) +
   geom_histogram(bins = 25, alpha = 0.7, position = "identity") +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
   theme_minimal() + ggtitle("Score vs. churn")
-
+# Score Distribution by Churn Status
 p2 <- ggplot(data, aes(x = factor(Left), y = Score, fill = factor(Left))) +
   geom_boxplot(alpha = 0.7) +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -460,7 +440,7 @@ p2 <- ggplot(data, aes(x = factor(Left), y = Score, fill = factor(Left))) +
        y = "Score") +
   theme_minimal()
 
-
+# Score Density by Churn Status
 p3 <- ggplot(data, aes(x = Score, fill = factor(Left))) +
   geom_density(alpha = 0.5) +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -468,12 +448,13 @@ p3 <- ggplot(data, aes(x = Score, fill = factor(Left))) +
        x = "Score",
        y = "Density") +
   theme_minimal()
- 
+# Choose Six Key Points in Calculating Score
 score_quantiles <- quantile(data$Score, probs = c(0, 0.2,0.4,0.6,0.8,1), na.rm = TRUE)
+# Split the Score data
 data <- data %>%
   mutate(Score_Binned = cut(Score, breaks = 20))
 score_bins <- unique(as.character(cut(score_quantiles, breaks = 20)))
-
+#Proportion of Churn Rate by Score
 p4 <- ggplot(data, aes(x = Score_Binned, fill = factor(Left))) +
   geom_bar(position = "fill") +  # Make the data in each Score_Binned proportional
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -484,7 +465,7 @@ p4 <- ggplot(data, aes(x = Score_Binned, fill = factor(Left))) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+  # Rotate x-axis labels to prevent overlap
   scale_x_discrete(breaks = score_bins)   
-
+# Show charts
 (p1 | p4) /(p3 | p2)
 p4
 
@@ -498,13 +479,14 @@ p4
 #Products_in_Use vs Left
 data$Products_in_Use <- as.factor(data$Products_in_Use)
 
+#Bar plot for products_in_Use
 p1 <- ggplot(data, aes(x = Products_in_Use, fill = factor(Left))) +
-  geom_bar(position = "stack") +  # 使用 geom_bar() 而不是 geom_histogram()
+  geom_bar(position = "stack") +  
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
   theme_minimal() + 
   ggtitle("Products num vs. churn")
 
-#p1
+#Products_in_Use Density by Churn Status
 p2 <- ggplot(data, aes(x = Products_in_Use, fill = factor(Left))) +
   geom_density(alpha = 0.5) +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -512,7 +494,7 @@ p2 <- ggplot(data, aes(x = Products_in_Use, fill = factor(Left))) +
        x = "Salary",
        y = "Density") +
   theme_minimal()
-
+# Proportion of Churn Rate by Products_in_Use
 p3 <- ggplot(data, aes(x = Products_in_Use, fill = factor(Left))) +
   geom_bar(position = "fill") +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -521,44 +503,18 @@ p3 <- ggplot(data, aes(x = Products_in_Use, fill = factor(Left))) +
        y = "Proportion",
        fill = "Churn Status") +
   theme_minimal()
-
+#Show charts
 p1 | (p2 / p3)
-#p1
-#p1
-#p2
-#p3
-```
-```{r}
-#print(nrow(data %>%filter(Products_in_Use == 1)))
-#print(nrow(data %>%filter(Products_in_Use == 2 )))
-#print(nrow(data %>%filter(Products_in_Use == 3 )))
-#print(nrow(data %>%filter(Products_in_Use == 4 )))
-#print('--------------')
-#print(nrow(data %>%filter(Products_in_Use == 1 & Left == 0)))
-#print(nrow(data %>%filter(Products_in_Use == 1 & Left == 1)))
-
-#print(nrow(data %>%filter(Products_in_Use == 2 & Left == 0)))
-#print(nrow(data %>%filter(Products_in_Use == 2 & Left == 1)))
-#print(nrow(data %>%filter(Products_in_Use == 3 & Left == 0)))
-#print(nrow(data %>%filter(Products_in_Use == 3 & Left == 1)))
-#print(nrow(data %>%filter(Products_in_Use == 4 & Left == 0)))
-#print(nrow(data %>%filter(Products_in_Use == 4 & Left == 1)))
 
 ```
+
 
 
 
 ```{r}
 # gender vs. churn
-#ggplot(data, aes(x = Gender, fill = factor(Left))) +
-#  geom_bar(position = "stack") +
-#  scale_fill_manual(values = c("red", "blue"), labels = c("Retained", "Churned")) +
-#  labs(title = "Churn Distribution by Gender",
-#       x = "Gender",
-#       y = "Count",
-#       fill = "Churn Status") +
-#  theme_minimal()
 
+#Churn Distribution by Gender
 p1 <- ggplot(data, aes(x = factor(Gender), fill = factor(Left))) +
   geom_bar(position = "dodge") +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -567,7 +523,7 @@ p1 <- ggplot(data, aes(x = factor(Gender), fill = factor(Left))) +
        y = "Count",
        fill = "Churn Status") +
   theme_minimal()
-
+#Proportion plot of Churn Rate by Gender
 p2 <- ggplot(data, aes(x = factor(Gender), fill = factor(Left))) +
   geom_bar(position = "fill") +
   scale_fill_manual(values = c("#AFD3E7", "#9A72C7"), labels = c("Retained", "Churned")) +
@@ -576,6 +532,7 @@ p2 <- ggplot(data, aes(x = factor(Gender), fill = factor(Left))) +
        y = "Proportion",
        fill = "Churn Status") +
   theme_minimal()
+#Show charts
 p1|p2
 
 ```
