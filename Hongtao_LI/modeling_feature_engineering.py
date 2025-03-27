@@ -8,7 +8,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     accuracy_score, roc_auc_score, recall_score, roc_curve, classification_report
 )
-from imblearn.over_sampling import SMOTE
 from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsClassifier
 from xgboost import XGBClassifier
@@ -53,17 +52,13 @@ def train_models(X_train, X_test, y_train, y_test):
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
     
-    # Apply SMOTE for models that need it
-    smote = SMOTE(random_state=17)
-    X_train_smote, y_train_smote = smote.fit_resample(X_train_scaled, y_train)
-    
     # KNN with SMOTE
     knn_model = KNeighborsClassifier(
         n_neighbors=7,
         weights='distance',
         metric='manhattan',
         p=1
-    ).fit(X_train_smote, y_train_smote)
+    ).fit(X_train_scaled, y_train)
     
     # XGBoost (no SMOTE, using scale_pos_weight)
     scale_pos_weight = len(y_train[y_train==0]) / len(y_train[y_train==1])
@@ -90,7 +85,7 @@ def train_models(X_train, X_test, y_train, y_test):
         early_stopping=True,
         validation_fraction=0.2,
         random_state=17
-    ).fit(X_train_smote, y_train_smote)
+    ).fit(X_train_scaled, y_train)
     
     # Store models
     models = {

@@ -12,7 +12,6 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold
 from sklearn.metrics import accuracy_score, roc_auc_score, classification_report, recall_score, precision_score
-from imblearn.over_sampling import SMOTE
 import shap
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -39,10 +38,6 @@ scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
-# Apply SMOTE for models that need it
-smote = SMOTE(random_state=17)
-X_train_smote, y_train_smote = smote.fit_resample(X_train_scaled, y_train)
-
 # Initialize dictionaries to store models and results
 models = {}
 results = {}
@@ -62,7 +57,7 @@ knn_model = KNeighborsClassifier(
 models['KNN'] = knn_model
 
 # ======================
-# 3. XGBoost (no SMOTE, using scale_pos_weight)
+# 3. XGBoost Implementation
 # ======================
 from xgboost import XGBClassifier
 
