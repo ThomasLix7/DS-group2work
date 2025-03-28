@@ -1,14 +1,18 @@
+# ======================
+# 1. Data Preparation
+# ======================
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, classification_report, roc_auc_score, recall_score
-from sklearn.metrics import roc_curve
-import joblib
+from sklearn.metrics import accuracy_score, classification_report, roc_auc_score, recall_score, roc_curve
 
-# Function to train and evaluate a basic model
+# ======================
+# 2. Basic Model Implementation
+# ======================
 def train_basic_model(X_train, X_test, y_train, y_test):
+    """Train and evaluate a basic KNN model with default parameters"""
     print("\n" + "="*50)
     print("Training Basic KNN Model (Default Parameters)")
     print("="*50)
@@ -44,6 +48,9 @@ def train_basic_model(X_train, X_test, y_train, y_test):
     
     return basic_model, auc, recall_optimal, optimal_threshold
 
+# ======================
+# 3. Data Loading and Preprocessing
+# ======================
 # Load and preprocess data
 df = pd.read_csv("QM_pre-process/output.csv")
 df = df.drop(['Customer_ID', 'Source'], axis=1)
@@ -66,6 +73,9 @@ scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
+# ======================
+# 4. Model Training and Evaluation
+# ======================
 # Train basic model first to establish baseline
 basic_model, basic_auc, basic_recall, basic_optimal_threshold = train_basic_model(X_train_scaled, X_test_scaled, y_train, y_test)
 
@@ -73,7 +83,7 @@ print("\n" + "="*50)
 print("Hyperparameter Tuning Process")
 print("="*50)
 
-# Define parameter grid - using the same grid as knn_smote.py
+# Define parameter grid for hyperparameter tuning
 param_grid = {
     'n_neighbors': [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33],
     'weights': ['uniform', 'distance'],
@@ -125,6 +135,9 @@ print(f"Recall Score: {recall_optimal:.4f}")
 print("\nClassification Report (Optimal threshold):")
 print(classification_report(y_test, y_pred_optimal))
 
+# ======================
+# 5. Model Comparison
+# ======================
 # Add comparison of basic vs tuned model
 print("\n" + "="*50)
 print("BASIC VS FINE-TUNED MODEL PERFORMANCE COMPARISON")
@@ -132,16 +145,10 @@ print("="*50)
 print(f"{'Metric':<15}{'Basic Model':<15}{'Fine-tuned Model':<15}{'Improvement':<15}")
 print(f"{'-'*60}")
 
-# Optimal threshold comparison
+# Performance comparison
 print(f"{'AUC':<15}{basic_auc:.4f}{'':<7}{auc:.4f}{'':<7}{((auc-basic_auc)/basic_auc)*100:.2f}%")
 print(f"{'Recall':<15}{basic_recall:.4f}{'':<7}{recall_optimal:.4f}{'':<7}{((recall_optimal-basic_recall)/basic_recall)*100:.2f}%")
 print(f"\nOptimal thresholds: Basic model: {basic_optimal_threshold:.3f}, Fine-tuned model: {optimal_threshold:.3f}")
 
 print("\nBest Parameters for future use:")
 print(grid_search.best_params_)
-
-# Save the best model and scaler
-joblib.dump(best_model, 'best_knn_model_updated.joblib')
-joblib.dump(scaler, 'knn_scaler_updated.joblib')
-
-print("\nBest model and scaler saved for future use.") 

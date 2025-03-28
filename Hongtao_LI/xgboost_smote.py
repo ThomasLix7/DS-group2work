@@ -1,13 +1,21 @@
+# ======================
+# 1. Data Preparation
+# ======================
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.metrics import (
+    accuracy_score, classification_report, roc_auc_score, 
+    recall_score, balanced_accuracy_score, roc_curve
+)
 from xgboost import XGBClassifier
-from sklearn.metrics import accuracy_score, classification_report, roc_auc_score, recall_score, balanced_accuracy_score
-from sklearn.metrics import roc_curve
 from imblearn.over_sampling import SMOTE
 
-# Function to train and evaluate a basic model with SMOTE
+# ======================
+# 2. Model Evaluation Implementation
+# ======================
 def train_basic_model_smote(X_train, X_test, y_train, y_test):
+    """Train and evaluate a basic XGBoost model with SMOTE using default parameters"""
     print("\n" + "="*50)
     print("Training Basic XGBoost Model with SMOTE (Default Parameters)")
     print("="*50)
@@ -54,6 +62,9 @@ def train_basic_model_smote(X_train, X_test, y_train, y_test):
     
     return basic_model, auc, recall_optimal, optimal_threshold
 
+# ======================
+# 3. Data Loading and Preprocessing
+# ======================
 # Load and preprocess data
 df = pd.read_csv("QM_pre-process/output.csv")
 df = df.drop(['Customer_ID', 'Source'], axis=1)
@@ -62,7 +73,7 @@ df = df.drop(['Customer_ID', 'Source'], axis=1)
 X = df.drop('Left', axis=1)
 y = df['Left']
 
-# Calculate scale_pos_weight
+# Calculate scale_pos_weight for class balancing
 scale_pos_weight = len(y[y==0]) / len(y[y==1])
 
 # Print original class distribution
@@ -74,6 +85,9 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
 
+# ======================
+# 4. Model Training and Evaluation
+# ======================
 # Train basic model with SMOTE first to establish baseline
 basic_model, basic_auc, basic_recall, basic_optimal_threshold = train_basic_model_smote(X_train, X_test, y_train, y_test)
 
@@ -92,11 +106,11 @@ print(pd.Series(y_train_smote).value_counts(normalize=True))
 
 # 1. XGBoost with SMOTE
 param_grid_smote = {
-    'max_depth': [3, 4, 5],
-    'learning_rate': [0.01, 0.05, 0.1],
-    'n_estimators': [100, 200],
-    'subsample': [0.8, 0.9, 1.0],
-    'colsample_bytree': [0.8, 0.9, 1.0]
+    'max_depth': [3, 4, 5],  # Tree depth for controlling model complexity
+    'learning_rate': [0.01, 0.05, 0.1],  # Step size for gradient descent
+    'n_estimators': [100, 200],  # Number of boosting rounds
+    'subsample': [0.8, 0.9, 1.0],  # Sample ratio for training trees
+    'colsample_bytree': [0.8, 0.9, 1.0]  # Feature ratio for training trees
 }
 
 xgb_smote = XGBClassifier(
@@ -109,7 +123,7 @@ xgb_smote = XGBClassifier(
 grid_search_smote = GridSearchCV(
     xgb_smote,
     param_grid_smote,
-    cv=5,
+    cv=5,  # 5-fold cross-validation for robust evaluation
     scoring='roc_auc',
     n_jobs=-1,
     verbose=1
@@ -120,14 +134,14 @@ xgb_weight = XGBClassifier(
     objective='binary:logistic',
     eval_metric='auc',
     use_label_encoder=False,
-    scale_pos_weight=scale_pos_weight,
+    scale_pos_weight=scale_pos_weight,  # Class weight balancing
     random_state=17
 )
 
 grid_search_weight = GridSearchCV(
     xgb_weight,
     param_grid_smote,  # Same parameters
-    cv=5,
+    cv=5,  # 5-fold cross-validation for robust evaluation
     scoring='roc_auc',
     n_jobs=-1,
     verbose=1
@@ -138,14 +152,14 @@ xgb_both = XGBClassifier(
     objective='binary:logistic',
     eval_metric='auc',
     use_label_encoder=False,
-    scale_pos_weight=scale_pos_weight,
+    scale_pos_weight=scale_pos_weight,  # Class weight balancing
     random_state=17
 )
 
 grid_search_both = GridSearchCV(
     xgb_both,
     param_grid_smote,  # Same parameters
-    cv=5,
+    cv=5,  # 5-fold cross-validation for robust evaluation
     scoring='roc_auc',
     n_jobs=-1,
     verbose=1
@@ -236,7 +250,9 @@ for name, model in models.items():
     print("\nTop 10 Feature Importance:")
     print(importance_df.head(10))
 
-# Add comparison of basic vs best tuned model
+# ======================
+# 5. Model Comparison
+# ======================
 print("\n" + "="*50)
 print(f"BASIC VS FINE-TUNED MODEL PERFORMANCE COMPARISON (BOTH WITH SMOTE)")
 print("="*50)

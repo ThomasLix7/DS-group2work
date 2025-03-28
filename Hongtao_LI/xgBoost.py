@@ -1,11 +1,20 @@
+# ======================
+# 1. Data Preparation
+# ======================
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.metrics import (
+    accuracy_score, classification_report, roc_auc_score, 
+    recall_score, roc_curve
+)
 import xgboost as xgb
-from sklearn.metrics import accuracy_score, classification_report, roc_auc_score, recall_score, roc_curve
 
-# Function to train a basic model with default parameters
+# ======================
+# 2. Model Evaluation Implementation
+# ======================
 def train_basic_model(X_train, X_test, y_train, y_test):
+    """Train and evaluate a basic XGBoost model with default parameters"""
     print("\n" + "="*50)
     print("Training Basic XGBoost Model (Default Parameters)")
     print("="*50)
@@ -41,6 +50,9 @@ def train_basic_model(X_train, X_test, y_train, y_test):
     
     return basic_model, auc, recall_optimal, optimal_threshold
 
+# ======================
+# 3. Data Loading and Preprocessing
+# ======================
 # Load and preprocess data
 df = pd.read_csv("QM_pre-process/output.csv")
 df = df.drop(['Customer_ID', 'Source'], axis=1)
@@ -52,6 +64,9 @@ y = df['Left']
 # Split the data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+# ======================
+# 4. Model Training and Evaluation
+# ======================
 # Train basic model first to establish baseline
 basic_model, basic_auc, basic_recall, basic_optimal_threshold = train_basic_model(X_train, X_test, y_train, y_test)
 
@@ -61,17 +76,17 @@ print("="*50)
 
 # Train XGBoost model with Grid Search
 param_grid = {
-    'max_depth': [3, 5, 7],
-    'learning_rate': [0.1, 0.01, 0.05],
-    'n_estimators': [100, 200, 300],
-    'subsample': [0.8, 1.0],
-    'colsample_bytree': [0.8, 1.0]
+    'max_depth': [3, 5, 7],  # Tree depth for controlling model complexity
+    'learning_rate': [0.1, 0.01, 0.05],  # Step size for gradient descent
+    'n_estimators': [100, 200, 300],  # Number of boosting rounds
+    'subsample': [0.8, 1.0],  # Sample ratio for training trees
+    'colsample_bytree': [0.8, 1.0]  # Feature ratio for training trees
 }
 
 grid_search = GridSearchCV(
     estimator=xgb.XGBClassifier(random_state=42, eval_metric='logloss'),
     param_grid=param_grid,
-    cv=5,
+    cv=5,  # 5-fold cross-validation for robust evaluation
     scoring='roc_auc',
     n_jobs=-1
 )
@@ -109,7 +124,9 @@ print(f"Recall Score: {tuned_recall_optimal:.4f}")
 print("\nClassification Report (Optimal threshold):")
 print(classification_report(y_test, y_pred_optimal))
 
-# Add comparison of basic vs tuned model
+# ======================
+# 5. Model Comparison
+# ======================
 print("\n" + "="*50)
 print("BASIC VS FINE-TUNED MODEL PERFORMANCE COMPARISON")
 print("="*50)

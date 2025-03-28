@@ -1,15 +1,23 @@
+# ======================
+# 1. Data Preparation
+# ======================
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score, classification_report, roc_auc_score, recall_score, precision_score, f1_score, balanced_accuracy_score
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import (
+    accuracy_score, classification_report, roc_auc_score, recall_score, 
+    precision_score, f1_score, balanced_accuracy_score, roc_curve
+)
 from imblearn.over_sampling import SMOTE
-from sklearn.metrics import roc_curve, precision_recall_curve
 from collections import Counter
 
-# Function to evaluate a model with various metrics
+# ======================
+# 2. Model Evaluation Implementation
+# ======================
 def evaluate_model(model, X_test, y_test, model_name="Model"):
+    """Evaluate model performance with various metrics"""
     # Get predictions
     y_pred = model.predict(X_test)
     y_pred_proba = model.predict_proba(X_test)[:, 1]
@@ -67,6 +75,9 @@ def evaluate_model(model, X_test, y_test, model_name="Model"):
         'threshold': optimal_threshold
     }
 
+# ======================
+# 3. Data Loading and Preprocessing
+# ======================
 # Load and preprocess data
 print("\nLoading and preprocessing data...")
 df = pd.read_csv("QM_pre-process/output.csv")
@@ -107,9 +118,10 @@ X_train_smote, y_train_smote = smote.fit_resample(X_train_scaled, y_train)
 print("\nSMOTE-balanced class distribution:")
 print(pd.Series(y_train_smote).value_counts(normalize=True))
 
-# =============================================
+# ======================
+# 4. Model Training and Evaluation
+# ======================
 # Approach 1: Basic KNN with default parameters
-# =============================================
 print("\n" + "="*50)
 print("Approach 1: Basic KNN with default parameters")
 print("="*50)
@@ -118,9 +130,7 @@ basic_knn = KNeighborsClassifier()
 basic_knn.fit(X_train_scaled, y_train)
 basic_results = evaluate_model(basic_knn, X_test_scaled, y_test, "Basic KNN")
 
-# =============================================
 # Approach 2: Basic KNN with SMOTE
-# =============================================
 print("\n" + "="*50)
 print("Approach 2: Basic KNN with SMOTE")
 print("="*50)
@@ -129,9 +139,7 @@ smote_knn = KNeighborsClassifier()
 smote_knn.fit(X_train_smote, y_train_smote)
 smote_results = evaluate_model(smote_knn, X_test_scaled, y_test, "KNN with SMOTE")
 
-# =============================================
 # Approach 3: KNN with sample weights
-# =============================================
 print("\n" + "="*50)
 print("Approach 3: KNN with sample weights")
 print("="*50)
@@ -142,14 +150,12 @@ weighted_knn = KNeighborsClassifier(weights='distance')  # Use distance weightin
 weighted_knn.fit(X_train_scaled, y_train)
 weighted_results = evaluate_model(weighted_knn, X_test_scaled, y_test, "KNN with distance weights")
 
-# =============================================
 # Approach 4: Fine-tuned KNN (without SMOTE)
-# =============================================
 print("\n" + "="*50)
 print("Approach 4: Fine-tuned KNN (without SMOTE)")
 print("="*50)
 
-# Define a wider parameter grid matching knn.py
+# Define parameter grid for hyperparameter tuning
 param_grid = {
     'n_neighbors': list(range(1, 32, 2)),  # Odd numbers from 1 to 31
     'weights': ['uniform', 'distance'],
@@ -178,9 +184,7 @@ print(f"Best cross-val ROC AUC score: {grid_search.best_score_:.4f}")
 # Evaluate best model
 tuned_results = evaluate_model(best_model, X_test_scaled, y_test, "Fine-tuned KNN")
 
-# =============================================
 # Approach 5: Fine-tuned KNN with SMOTE
-# =============================================
 print("\n" + "="*50)
 print("Approach 5: Fine-tuned KNN with SMOTE")
 print("="*50)
@@ -206,9 +210,9 @@ print(f"Best cross-val ROC AUC score: {grid_search_smote.best_score_:.4f}")
 # Evaluate best model
 tuned_smote_results = evaluate_model(best_model_smote, X_test_scaled, y_test, "Fine-tuned KNN with SMOTE")
 
-# =============================================
-# Compare all approaches
-# =============================================
+# ======================
+# 5. Model Comparison
+# ======================
 print("\n" + "="*50)
 print("COMPARISON OF ALL APPROACHES")
 print("="*50)
@@ -228,7 +232,7 @@ print("-" * 75)
 for name, results in models:
     print(f"{name:<25}{results['auc']:.4f}{'':<5}{results['recall']:.4f}{'':<5}{results['precision']:.4f}{'':<5}{results['f1']:.4f}{'':<5}{results['threshold']:.4f}")
 
-# Find the best model based on AUC score instead of F1
+# Find the best model based on AUC score
 best_model_name, best_model_results = max(models, key=lambda x: x[1]['auc'])
 
 print("\nBest model based on AUC score:")
@@ -238,11 +242,3 @@ print(f"Recall: {best_model_results['recall']:.4f}")
 print(f"Precision: {best_model_results['precision']:.4f}")
 print(f"F1 Score: {best_model_results['f1']:.4f}")
 print(f"Threshold: {best_model_results['threshold']:.4f}")
-
-# Save the best model
-import joblib
-joblib.dump(best_model_results['model'], 'best_knn_model.joblib')
-joblib.dump(scaler, 'knn_scaler.joblib')
-
-print("\nBest model saved as 'best_knn_model.joblib'")
-print("Scaler saved as 'knn_scaler.joblib'") 

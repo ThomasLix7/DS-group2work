@@ -1,17 +1,22 @@
+# ======================
+# 1. Data Preparation
+# ======================
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score, learning_curve, StratifiedKFold, GridSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
-from sklearn.metrics import accuracy_score, classification_report, balanced_accuracy_score, roc_auc_score, recall_score, roc_curve
-from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import learning_curve
-from sklearn.model_selection import StratifiedKFold
-from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import (
+    accuracy_score, classification_report, balanced_accuracy_score, 
+    roc_auc_score, recall_score, roc_curve
+)
 from sklearn.inspection import permutation_importance
 
-# Function to train and evaluate a basic model
+# ======================
+# 2. Model Evaluation Implementation
+# ======================
 def train_basic_model(X_train, X_test, y_train, y_test):
+    """Train and evaluate a basic neural network model with default parameters"""
     print("\n" + "="*50)
     print("Training Basic Neural Network Model (Default Parameters)")
     print("="*50)
@@ -49,6 +54,9 @@ def train_basic_model(X_train, X_test, y_train, y_test):
     
     return basic_model, auc, recall_optimal, optimal_threshold
 
+# ======================
+# 3. Data Loading and Preprocessing
+# ======================
 # Load and preprocess data
 df = pd.read_csv("QM_pre-process/output.csv")
 df = df.drop(['Customer_ID', 'Source'], axis=1)
@@ -70,6 +78,9 @@ scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
+# ======================
+# 4. Model Training and Evaluation
+# ======================
 # Train basic model first to establish baseline
 basic_model, basic_auc, basic_recall, basic_optimal_threshold = train_basic_model(X_train_scaled, X_test_scaled, y_train, y_test)
 
@@ -79,20 +90,20 @@ print("="*50)
 
 # Modified parameter grid with more options and simpler architectures
 param_grid = {
-    'hidden_layer_sizes': [(50,), (100,), (50,25), (64,32), (100,50)],  # Include simpler architectures
+    'hidden_layer_sizes': [(50,), (100,), (50,25), (64,32), (100,50)],  # Simpler architectures for better generalization
     'activation': ['relu', 'tanh'],
-    'alpha': [0.0001, 0.001, 0.01, 0.1],  # More regularization options
+    'alpha': [0.0001, 0.001, 0.01, 0.1],  # Range of regularization strengths
     'learning_rate_init': [0.0001, 0.001, 0.01],
     'batch_size': [64, 128, 256],
-    'max_iter': [1000],  # Simplified to one option to reduce grid size
-    'solver': ['adam']  # Focus on adam solver which works well for most cases
+    'max_iter': [1000],  # Maximum iterations for convergence
+    'solver': ['adam']  # Adam optimizer for efficient training
 }
 
 # Initialize model with minimal configuration
 model = MLPClassifier(
     random_state=17,
     early_stopping=True,
-    validation_fraction=0.1,  # Reduced from 0.2 to use more data for training
+    validation_fraction=0.1,  # 10% of training data used for validation
     n_iter_no_change=10
 )
 
@@ -100,7 +111,7 @@ model = MLPClassifier(
 grid_search = GridSearchCV(
     estimator=model,
     param_grid=param_grid,
-    cv=StratifiedKFold(n_splits=5),  # Increased from 3 to 5 folds
+    cv=StratifiedKFold(n_splits=5),  # 5-fold cross-validation for robust evaluation
     scoring='roc_auc',
     n_jobs=-1,
     verbose=2
@@ -170,7 +181,9 @@ print(f"Recall Score: {tuned_recall_optimal:.4f}")
 print("\nClassification Report (Optimal threshold):")
 print(classification_report(y_test, y_pred_optimal))
 
-# Add comparison of basic vs tuned model
+# ======================
+# 5. Model Comparison
+# ======================
 print("\n" + "="*50)
 print("BASIC VS FINE-TUNED MODEL PERFORMANCE COMPARISON")
 print("="*50)

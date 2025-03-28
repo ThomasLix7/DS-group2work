@@ -1,18 +1,29 @@
+# ======================
+# 1. Data Preparation
+# ======================
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 import matplotlib.pyplot as plt
+from matplotlib.ticker import ScalarFormatter, FormatStrFormatter
+from matplotlib.patches import Patch
 import statsmodels.api as sm
 
+# ======================
+# 2. Data Loading and Preprocessing
+# ======================
 def load_and_preprocess_data():
+    """Load and preprocess the dataset"""
     # Load data
     df = pd.read_csv("QM_pre-process/output.csv")
     df = df.drop(['Customer_ID', 'Source'], axis=1)
     
     return df
 
+# ======================
+# 3. Statistical Model Implementation
+# ======================
 def statistical_model(df):
     """
     Train a logistic regression model focused on statistical interpretation
@@ -137,7 +148,6 @@ def statistical_model(df):
     plt.xscale('log')  # Use log scale for better visualization
     
     # Fix x-axis formatting to avoid scientific notation
-    from matplotlib.ticker import ScalarFormatter, FormatStrFormatter
     ax = plt.gca()
     ax.xaxis.set_major_formatter(ScalarFormatter())
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.1f'))
@@ -149,7 +159,6 @@ def statistical_model(df):
     plt.xlim([min_lower, max_upper])
     
     # Add custom legend
-    from matplotlib.patches import Patch
     legend_elements = [
         Patch(facecolor='#1f77b4', label='Significant (p < 0.05)'),
         Patch(facecolor='#d3d3d3', label='Not significant')
@@ -200,6 +209,9 @@ def statistical_model(df):
         'scaler': scaler
     }
 
+# ======================
+# 4. Main Execution
+# ======================
 def main():
     # Load and preprocess data
     df = load_and_preprocess_data()

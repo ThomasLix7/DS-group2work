@@ -36,9 +36,9 @@ from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
 # Initialize results dictionary
 results = {}
 
-knn_model = KNeighborsClassifier(
-    n_neighbors=33,           # Updated from knn_updated.py best parameters
-    weights='distance',       # Updated from knn_updated.py best parameters
+knn_model = KNeighborsClassifier(# Updated from knn.py best parameters
+    n_neighbors=33,           
+    weights='distance',       
     metric='manhattan',      
     p=1                      
 ).fit(X_train_scaled, y_train)
@@ -51,11 +51,11 @@ from xgboost import XGBClassifier
 # Calculate scale_pos_weight
 scale_pos_weight = len(y[y==0]) / len(y[y==1])
 
-xgb_model = XGBClassifier(
-    max_depth=3,           # From xgBoost.py best parameters
-    learning_rate=0.05,    # Updated from 0.1 to 0.05
-    n_estimators=200,      # Updated from 100 to 200
-    subsample=1.0,         # Updated from 0.8 to 1.0
+xgb_model = XGBClassifier( # From xgBoost.py best parameters
+    max_depth=3,          
+    learning_rate=0.05,    
+    n_estimators=200,      
+    subsample=1.0,         
     colsample_bytree=0.8,  
     eval_metric='auc',
     random_state=17,
@@ -67,8 +67,8 @@ xgb_model = XGBClassifier(
 # ======================
 from sklearn.neural_network import MLPClassifier
 
-nn_model = MLPClassifier(
-    hidden_layer_sizes=(64, 32),  # Updated from best parameters
+nn_model = MLPClassifier(# Updated from best parameter searching(nn.py)
+    hidden_layer_sizes=(64, 32),  
     activation='tanh',               
     solver='adam',
     alpha=0.1,                        
@@ -88,7 +88,7 @@ from sklearn.metrics import roc_curve
 # Dictionary to store test data for each model
 test_data = {
     'KNN': (X_test_scaled, y_test),
-    'XGBoost': (X_test, y_test),
+    'XGBoost': (X_test, y_test), #xgboost model doesn't need scaling
     'NeuralNet': (X_test_scaled, y_test)
 }
 
@@ -114,7 +114,7 @@ for name, model in models.items():
     optimal_idx = np.argmax(j_scores)
     optimal_threshold = thresholds[optimal_idx]
     
-    # Handle KNN differently as in the original code
+    # Handle KNN differently
     if name == 'KNN':
         # For KNN, use its native predict method as it has its own decision boundary logic
         y_pred = model.predict(X_test_curr)

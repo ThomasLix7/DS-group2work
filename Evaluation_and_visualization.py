@@ -1,5 +1,5 @@
 """
-Advanced Customer Attrition Modeling and Visualization
+ Author: Yukun Cui
 """
 import warnings
 warnings.filterwarnings('ignore')
